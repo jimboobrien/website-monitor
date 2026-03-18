@@ -1,9 +1,10 @@
 # Website Status Monitor 🔍
 
-A simple, free website uptime monitoring tool that checks your WordPress sites and sends email alerts via SendGrid when they're down.
+A powerful, free website monitoring tool with visual comparison testing, custom element checking, and email alerts via SendGrid.
 
 ## ✨ Features
 
+### Phase 1 (Basic Monitoring)
 - ✅ **Automated monitoring** - Checks websites every 5 minutes
 - 👥 **Client management** - Group websites by client for organized tracking
 - 📧 **Email alerts** - SendGrid integration for instant notifications
@@ -11,6 +12,14 @@ A simple, free website uptime monitoring tool that checks your WordPress sites a
 - ⚡ **Fast** - Serverless functions for quick checks
 - 📊 **Response tracking** - Monitors response times and status codes
 - 🔧 **Easy configuration** - Simple JSON config file
+
+### 🚀 Phase 2 (Advanced Features) - NEW!
+- 🎨 **Visual comparison testing** - Detect layout breaks and design changes
+- 🎯 **Custom element checks** - Verify sliders, forms, images, and links work
+- 💾 **Historical tracking** - Store uptime history and trends
+- 🔍 **Deep inspection** - Run custom JavaScript for advanced checks
+
+**[📖 Read the Phase 2 Documentation](PHASE2.md)**
 
 ## 🚀 Quick Start
 
@@ -106,6 +115,63 @@ In your Netlify dashboard:
 ### 7. Monitor automatically
 
 Netlify will automatically run your monitor function every 5 minutes based on the `netlify.toml` configuration.
+
+---
+
+## 🚀 Phase 2: Advanced Monitoring
+
+**Phase 2 is now available!** It adds visual comparison testing and custom element checks.
+
+### What can Phase 2 do?
+
+**Visual Comparison:**
+- Take screenshots and compare against baselines
+- Detect layout breaks, missing content, CSS issues
+- Get alerts when your site's appearance changes
+
+**Custom Checks:**
+- ✅ Verify sliders/carousels are working
+- ✅ Check forms exist and have submit buttons
+- ✅ Ensure images loaded properly
+- ✅ Confirm links are clickable
+- ✅ Run custom JavaScript for advanced checks
+
+### Quick Start with Phase 2
+
+1. **Use the enhanced monitor:**
+   ```bash
+   cd netlify/functions
+   mv monitor.js monitor-basic.js
+   mv monitor-enhanced.js monitor.js
+   ```
+
+2. **Update your config** with Phase 2 features:
+   ```json
+   {
+     "name": "My Site",
+     "url": "https://mysite.com",
+     "visualCheck": {
+       "enabled": true,
+       "threshold": 5.0
+     },
+     "customChecks": [
+       {
+         "name": "Hero Slider",
+         "type": "slider-working",
+         "selector": ".hero-slider"
+       }
+     ]
+   }
+   ```
+
+3. **Test locally:**
+   ```bash
+   npm run test:enhanced
+   ```
+
+4. **Push to GitHub** - Netlify auto-deploys!
+
+**[📖 Full Phase 2 Documentation & Examples](PHASE2.md)**
 
 ---
 
@@ -257,15 +323,20 @@ With 5-minute intervals, you'll use ~8,640 checks/month - well within free limit
 
 ---
 
-## 🚧 Phase 2 Roadmap (Future)
+## 🔮 Future Enhancements (Phase 3)
 
-- 🎨 **Visual comparison testing** - PhantomJS/Puppeteer screenshots
-- 🎯 **Custom checks** - Slider functionality, specific elements, forms
-- 📈 **Uptime statistics** - Dashboard with historical data
-- 💾 **Data storage** - Keep historical uptime records
-- 🔔 **Multiple channels** - Slack, SMS, Discord notifications
-- 📱 **Mobile app** - iOS/Android companion app
-- 🌍 **Multi-region checks** - Test from different locations
+Phase 2 is complete! Here's what's next:
+
+- 📊 **Dashboard UI** - Web interface for viewing history and stats
+- 🌍 **Multi-region checks** - Test from different geographic locations
+- 📱 **Mobile vs Desktop** - Compare mobile and desktop views
+- 🔔 **More notification channels** - Slack, Discord, SMS, Webhook
+- 💾 **Persistent storage** - Cloud storage for baselines (S3, Netlify Blobs)
+- 📈 **Advanced analytics** - Uptime graphs, response time trends
+- 🔄 **Recovery notifications** - Alert when sites come back online
+- 🎯 **Performance monitoring** - Core Web Vitals, lighthouse scores
+
+**Want something else? Open an issue on GitHub!**
 
 ---
 

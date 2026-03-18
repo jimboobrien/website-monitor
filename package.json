@@ -1,23 +1,31 @@
 {
   "name": "website-status-monitor",
-  "version": "1.0.0",
-  "description": "Website uptime monitoring with email alerts via SendGrid",
+  "version": "2.0.0",
+  "description": "Website uptime monitoring with visual comparison testing, custom checks, and email alerts",
   "main": "index.js",
   "scripts": {
     "test": "node test-local.js",
+    "test:enhanced": "node test-enhanced.js",
     "dev": "netlify dev"
   },
   "keywords": [
     "monitoring",
     "uptime",
     "wordpress",
-    "sendgrid"
+    "sendgrid",
+    "visual-testing",
+    "puppeteer",
+    "automation"
   ],
   "author": "Jim O'Brien",
   "license": "MIT",
   "dependencies": {
     "@sendgrid/mail": "^7.7.0",
-    "node-fetch": "^2.7.0"
+    "@sparticuz/chromium": "^143.0.4",
+    "node-fetch": "^2.7.0",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.39.1"
   },
   "devDependencies": {
     "dotenv": "^17.3.1",

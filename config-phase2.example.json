@@ -1,0 +1,142 @@
+{
+  "clients": [
+    {
+      "id": "acme-corp",
+      "name": "Acme Corporation",
+      "email": "admin@acmecorp.com",
+      "notes": "Enterprise client - Full monitoring"
+    },
+    {
+      "id": "joes-shop",
+      "name": "Joe's Coffee Shop",
+      "email": "joe@joescoffee.com",
+      "notes": "Small business - WordPress site"
+    }
+  ],
+  "websites": [
+    {
+      "id": "acme-main",
+      "name": "Acme Main Site",
+      "url": "https://acmecorp.com",
+      "clientId": "acme-corp",
+      "visualCheck": {
+        "enabled": true,
+        "threshold": 5.0,
+        "fullPage": false,
+        "waitForSelector": ".main-content"
+      },
+      "customChecks": [
+        {
+          "name": "Hero Slider Check",
+          "type": "slider-working",
+          "selector": ".hero-slider",
+          "slideCount": 3
+        },
+        {
+          "name": "Contact Form Exists",
+          "type": "form-submits",
+          "selector": "#contact-form"
+        },
+        {
+          "name": "Logo Loaded",
+          "type": "image-loaded",
+          "selector": ".site-logo img"
+        }
+      ]
+    },
+    {
+      "id": "acme-blog",
+      "name": "Acme Blog",
+      "url": "https://blog.acmecorp.com",
+      "clientId": "acme-corp",
+      "customChecks": [
+        {
+          "name": "Latest Post Exists",
+          "type": "element-exists",
+          "selector": ".post-item:first-child"
+        },
+        {
+          "name": "Search Form Works",
+          "type": "form-submits",
+          "selector": ".search-form"
+        }
+      ]
+    },
+    {
+      "id": "joes-shop-main",
+      "name": "Joe's Coffee Shop",
+      "url": "https://joescoffee.com",
+      "clientId": "joes-shop",
+      "visualCheck": {
+        "enabled": true,
+        "threshold": 3.0,
+        "fullPage": true
+      },
+      "customChecks": [
+        {
+          "name": "Product Slider",
+          "type": "slider-working",
+          "selector": ".product-carousel"
+        },
+        {
+          "name": "Add to Cart Button",
+          "type": "element-exists",
+          "selector": ".add-to-cart"
+        },
+        {
+          "name": "Cart Link Clickable",
+          "type": "link-clickable",
+          "selector": ".cart-link"
+        },
+        {
+          "name": "Featured Image Loaded",
+          "type": "image-loaded",
+          "selector": ".featured-product img"
+        }
+      ]
+    },
+    {
+      "id": "joes-shop-store",
+      "name": "Joe's Online Store",
+      "url": "https://shop.joescoffee.com",
+      "clientId": "joes-shop",
+      "customChecks": [
+        {
+          "name": "Checkout Button Exists",
+          "type": "element-exists",
+          "selector": ".checkout-button"
+        },
+        {
+          "name": "Price Display",
+          "type": "text-contains",
+          "selector": ".product-price",
+          "text": "$"
+        },
+        {
+          "name": "Custom: Product Count",
+          "type": "custom-script",
+          "script": "return document.querySelectorAll('.product-item').length > 0"
+        }
+      ]
+    },
+    {
+      "id": "internal-tool",
+      "name": "Internal Dev Server",
+      "url": "https://dev.myagency.com",
+      "clientId": null,
+      "customChecks": [
+        {
+          "name": "Login Form",
+          "type": "element-exists",
+          "selector": "#login-form"
+        }
+      ]
+    }
+  ],
+  "checkIntervalMinutes": 5,
+  "notificationSettings": {
+    "emailOnDown": true,
+    "emailOnRecovery": false,
+    "groupByClient": true
+  }
+}
