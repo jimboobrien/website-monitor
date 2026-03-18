@@ -1,0 +1,17 @@
+{
+  "websites": [
+    {
+      "name": "Example Site 1",
+      "url": "https://example.com"
+    },
+    {
+      "name": "Example Site 2",
+      "url": "https://wordpress-site.example.com"
+    }
+  ],
+  "checkIntervalMinutes": 5,
+  "notificationSettings": {
+    "emailOnDown": true,
+    "emailOnRecovery": false
+  }
+}

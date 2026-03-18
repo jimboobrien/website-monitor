@@ -1,0 +1,20 @@
+{
+  "name": "website-status-monitor",
+  "version": "1.0.0",
+  "description": "Website uptime monitoring with email alerts via SendGrid",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test-local.js",
+    "dev": "netlify dev"
+  },
+  "keywords": ["monitoring", "uptime", "wordpress", "sendgrid"],
+  "author": "Jim O'Brien",
+  "license": "MIT",
+  "dependencies": {
+    "@sendgrid/mail": "^7.7.0",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}
