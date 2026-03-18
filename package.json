@@ -7,7 +7,12 @@
     "test": "node test-local.js",
     "dev": "netlify dev"
   },
-  "keywords": ["monitoring", "uptime", "wordpress", "sendgrid"],
+  "keywords": [
+    "monitoring",
+    "uptime",
+    "wordpress",
+    "sendgrid"
+  ],
   "author": "Jim O'Brien",
   "license": "MIT",
   "dependencies": {
@@ -15,6 +20,7 @@
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
+    "dotenv": "^17.3.1",
     "netlify-cli": "^17.0.0"
   }
 }

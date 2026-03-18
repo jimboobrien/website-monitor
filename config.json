@@ -1,17 +1,44 @@
 {
-  "websites": [
+  "clients": [
     {
-      "name": "Example Site 1",
-      "url": "https://example.com"
+      "id": "acme-corp",
+      "name": "Acme Corporation",
+      "email": "admin@acmecorp.com",
+      "notes": "Main corporate client"
     },
     {
-      "name": "Example Site 2",
-      "url": "https://wordpress-site.example.com"
+      "id": "joes-shop",
+      "name": "Joe's Coffee Shop",
+      "email": "joe@joescoffee.com",
+      "notes": "Local business - WordPress + WooCommerce"
+    }
+  ],
+  "websites": [
+    {
+      "name": "Acme Main Site",
+      "url": "https://acmecorp.com",
+      "clientId": "acme-corp"
+    },
+    {
+      "name": "Acme Blog",
+      "url": "https://blog.acmecorp.com",
+      "clientId": "acme-corp"
+    },
+    {
+      "name": "Joe's Coffee Shop",
+      "url": "https://joescoffee.com",
+      "clientId": "joes-shop"
+    },
+    {
+      "name": "Internal Tool",
+      "url": "https://internal-tool.example.com",
+      "clientId": null
     }
   ],
   "checkIntervalMinutes": 5,
   "notificationSettings": {
     "emailOnDown": true,
-    "emailOnRecovery": false
+    "emailOnRecovery": false,
+    "groupByClient": true
   }
 }
