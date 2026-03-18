@@ -1,0 +1,65 @@
+{
+  "clients": [
+    {
+      "id": "acme-corp",
+      "name": "Acme Corporation",
+      "email": "admin@acmecorp.com",
+      "notes": "Main corporate client - Enterprise package"
+    },
+    {
+      "id": "joes-shop",
+      "name": "Joe's Coffee Shop",
+      "email": "joe@joescoffee.com",
+      "notes": "Local business - WordPress + WooCommerce"
+    },
+    {
+      "id": "startup-xyz",
+      "name": "Startup XYZ",
+      "email": "tech@startupxyz.io",
+      "notes": "Tech startup - React SPA"
+    }
+  ],
+  "websites": [
+    {
+      "name": "Acme Main Site",
+      "url": "https://acmecorp.com",
+      "clientId": "acme-corp"
+    },
+    {
+      "name": "Acme Blog",
+      "url": "https://blog.acmecorp.com",
+      "clientId": "acme-corp"
+    },
+    {
+      "name": "Acme Customer Portal",
+      "url": "https://portal.acmecorp.com",
+      "clientId": "acme-corp"
+    },
+    {
+      "name": "Joe's Coffee Shop",
+      "url": "https://joescoffee.com",
+      "clientId": "joes-shop"
+    },
+    {
+      "name": "Joe's Online Store",
+      "url": "https://shop.joescoffee.com",
+      "clientId": "joes-shop"
+    },
+    {
+      "name": "Startup XYZ App",
+      "url": "https://app.startupxyz.io",
+      "clientId": "startup-xyz"
+    },
+    {
+      "name": "Internal Dev Server",
+      "url": "https://dev.myagency.com",
+      "clientId": null
+    }
+  ],
+  "checkIntervalMinutes": 5,
+  "notificationSettings": {
+    "emailOnDown": true,
+    "emailOnRecovery": false,
+    "groupByClient": true
+  }
+}
