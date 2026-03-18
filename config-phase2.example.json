@@ -42,7 +42,12 @@
           "type": "image-loaded",
           "selector": ".site-logo img"
         }
-      ]
+      ],
+      "snapshot": {
+        "enabled": true,
+        "frequency": "daily",
+        "keepCount": 30
+      }
     },
     {
       "id": "acme-blog",

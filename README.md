@@ -18,8 +18,10 @@ A powerful, free website monitoring tool with visual comparison testing, custom 
 - 🎯 **Custom element checks** - Verify sliders, forms, images, and links work
 - 💾 **Historical tracking** - Store uptime history and trends
 - 🔍 **Deep inspection** - Run custom JavaScript for advanced checks
+- 📸 **Website snapshots** - Your own Wayback Machine (capture screenshots & HTML over time)
 
-**[📖 Read the Phase 2 Documentation](PHASE2.md)**
+**[📖 Read the Phase 2 Documentation](PHASE2.md)**  
+**[📸 Read the Snapshots Documentation](SNAPSHOTS.md)**
 
 ## 🚀 Quick Start
 
@@ -266,6 +268,31 @@ https://your-site-name.netlify.app/.netlify/functions/monitor
 ```
 
 This is useful for testing after deployment.
+
+## 📸 Website Snapshots
+
+Capture and browse historical snapshots of your websites:
+
+**Snapshot Viewer (Visual Interface):**
+```
+https://your-site-name.netlify.app/.netlify/functions/snapshot-viewer
+```
+
+**Capture a Snapshot (API):**
+```
+https://your-site-name.netlify.app/.netlify/functions/snapshot?action=capture&websiteId=my-site
+```
+
+**[📖 Full Snapshots Documentation](SNAPSHOTS.md)**
+
+Features:
+- 📸 Screenshot capture over time
+- 📄 Simplified HTML archiving (no external assets)
+- 🖼️ Beautiful visual interface
+- 📊 Metadata tracking
+- 🔍 Browse historical versions
+
+Perfect for documenting changes, client reporting, and proving what your site looked like at any point in time!
 
 ---
 
