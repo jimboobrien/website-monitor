@@ -1,3 +1,4 @@
+const { schedule } = require('@netlify/functions');
 const fetch = require('node-fetch');
 const sgMail = require('@sendgrid/mail');
 const { visualCheck } = require('./lib/visual-check');
@@ -246,7 +247,7 @@ async function sendAlert(results) {
 /**
  * Main monitoring function (Enhanced Phase 2)
  */
-exports.handler = async (event, context) => {
+const monitorHandler = async (event, context) => {
   console.log('Starting enhanced website monitoring check (Phase 2)...');
   
   try {
@@ -338,3 +339,5 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+exports.handler = schedule("*/5 * * * *", monitorHandler);

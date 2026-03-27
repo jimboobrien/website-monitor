@@ -1,9 +1,2 @@
 [build]
   functions = "netlify/functions"
-
-[functions]
-  # Schedule the monitor to run every 5 minutes
-  # Netlify scheduled functions run on their free tier
-  
-[[plugins]]
-  package = "@netlify/plugin-functions-cron"

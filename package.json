@@ -20,6 +20,7 @@
   "author": "Jim O'Brien",
   "license": "MIT",
   "dependencies": {
+    "@netlify/functions": "^5.1.5",
     "@sendgrid/mail": "^7.7.0",
     "@sparticuz/chromium": "^143.0.4",
     "node-fetch": "^2.7.0",

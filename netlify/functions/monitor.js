@@ -1,3 +1,4 @@
+const { schedule } = require('@netlify/functions');
 const fetch = require('node-fetch');
 const sgMail = require('@sendgrid/mail');
 
@@ -159,7 +160,7 @@ async function sendAlert(results) {
 /**
  * Main monitoring function
  */
-exports.handler = async (event, context) => {
+const monitorHandler = async (event, context) => {
   console.log('Starting website monitoring check...');
   
   // Check if required environment variables are set
@@ -226,3 +227,5 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+exports.handler = schedule("*/5 * * * *", monitorHandler);
