@@ -1,4 +1,3 @@
-const { schedule } = require('@netlify/functions');
 const fetch = require('node-fetch');
 const sgMail = require('@sendgrid/mail');
 
