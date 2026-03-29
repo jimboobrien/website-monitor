@@ -30,21 +30,20 @@ async function takeSnapshot(url, options = {}) {
   } = options;
 
   let browser = null;
-  
+
   try {
     browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      args: [...chromium.args, '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+      defaultViewport: { width, height },
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
     });
 
     const page = await browser.newPage();
-    await page.setViewport({ width, height });
-    
-    await page.goto(url, { 
+
+    await page.goto(url, {
       waitUntil: 'networkidle2',
-      timeout 
+      timeout: Math.min(timeout, 20000)
     });
 
     const snapshot = {

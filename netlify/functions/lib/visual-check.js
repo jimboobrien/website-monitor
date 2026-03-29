@@ -26,8 +26,8 @@ async function takeScreenshot(url, options = {}) {
   
   try {
     browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      args: [...chromium.args, '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+      defaultViewport: { width, height },
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
     });

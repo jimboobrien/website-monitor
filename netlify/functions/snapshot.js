@@ -51,7 +51,7 @@ exports.handler = async (event, context) => {
         const snapshot = await takeSnapshot(website.url, {
           captureScreenshot: true,
           captureHTML: true,
-          fullPage: true
+          fullPage: false
         });
         
         if (!snapshot.success) {
