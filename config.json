@@ -73,11 +73,6 @@
       "clientId": "chris-hixson"
     },
     {
-      "name": "Quarterback Universe",
-      "url": "https://quarterbackuniverse.com",
-      "clientId": "chris-hixson"
-    },
-    {
       "name": "QBIQ Camp",
       "url": "https://qbiqcamp.com",
       "clientId": "chris-hixson"
@@ -104,17 +99,17 @@
     },
     {
       "name": "Our Pals Place",
-      "url": "https://ourpalsplace.com",
+      "url": "https://ourpalsplace.org",
       "clientId": "ops-pals-place"
     },
     {
       "name": "OPP Subdomain",
-      "url": "https://opp.ourpalsplace.com",
+      "url": "https://opp.ourpalsplace.org",
       "clientId": "ops-pals-place"
     },
     {
       "name": "DBT Our Pals Place",
-      "url": "https://dbt.ourpalsplace.com",
+      "url": "https://dbt.ourpalsplace.org",
       "clientId": "ops-pals-place"
     },
     {
