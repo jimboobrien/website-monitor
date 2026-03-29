@@ -228,4 +228,4 @@ const monitorHandler = async (event, context) => {
   }
 };
 
-exports.handler = schedule("*/5 * * * *", monitorHandler);
+exports.handler = monitorHandler;

@@ -1,38 +1,166 @@
 {
   "clients": [
     {
-      "id": "acme-corp",
-      "name": "Acme Corporation",
-      "email": "admin@acmecorp.com",
-      "notes": "Main corporate client"
+      "id": "vqdev",
+      "name": "VQDEV",
+      "email": "",
+      "notes": ""
     },
     {
-      "id": "joes-shop",
-      "name": "Joe's Coffee Shop",
-      "email": "joe@joescoffee.com",
-      "notes": "Local business - WordPress + WooCommerce"
+      "id": "chris-hixson",
+      "name": "Chris Hixson",
+      "email": "",
+      "notes": ""
+    },
+    {
+      "id": "cadence",
+      "name": "Cadence",
+      "email": "",
+      "notes": ""
+    },
+    {
+      "id": "ops-pals-place",
+      "name": "Ops Pals Place",
+      "email": "",
+      "notes": ""
+    },
+    {
+      "id": "uptown-life-group",
+      "name": "Uptown Life Group",
+      "email": "",
+      "notes": ""
     }
   ],
   "websites": [
     {
-      "name": "Acme Main Site",
-      "url": "https://acmecorp.com",
-      "clientId": "acme-corp"
+      "name": "Avena Family Photos",
+      "url": "https://avenafamilyphotos.com",
+      "clientId": "vqdev"
     },
     {
-      "name": "Acme Blog",
-      "url": "https://blog.acmecorp.com",
-      "clientId": "acme-corp"
+      "name": "Meow Were Talkin",
+      "url": "https://meowweretalkin.com",
+      "clientId": "vqdev"
     },
     {
-      "name": "Joe's Coffee Shop",
-      "url": "https://joescoffee.com",
-      "clientId": "joes-shop"
+      "name": "Pegasus Theme",
+      "url": "https://pegasustheme.com",
+      "clientId": "vqdev"
     },
     {
-      "name": "Internal Tool",
-      "url": "https://internal-tool.example.com",
+      "name": "VQDEV HTML",
+      "url": "https://vqdevhtml.com",
+      "clientId": "vqdev"
+    },
+    {
+      "name": "Vision Quest Dev",
+      "url": "https://visionquestdev.com",
+      "clientId": "vqdev"
+    },
+    {
+      "name": "Vision Quest Development",
+      "url": "https://visionquestdevelopment.com",
+      "clientId": "vqdev"
+    },
+    {
+      "name": "Chris Hixson",
+      "url": "https://chrishixson.com",
+      "clientId": "chris-hixson"
+    },
+    {
+      "name": "QBIQ System",
+      "url": "https://qbiqsystem.com",
+      "clientId": "chris-hixson"
+    },
+    {
+      "name": "Quarterback Universe",
+      "url": "https://quarterbackuniverse.com",
+      "clientId": "chris-hixson"
+    },
+    {
+      "name": "QBIQ Camp",
+      "url": "https://qbiqcamp.com",
+      "clientId": "chris-hixson"
+    },
+    {
+      "name": "The Shootout Camp",
+      "url": "https://theshootout.camp",
+      "clientId": "chris-hixson"
+    },
+    {
+      "name": "The Experience Camp",
+      "url": "https://theexperience.camp",
+      "clientId": "chris-hixson"
+    },
+    {
+      "name": "Cadence Group",
+      "url": "https://cadence-group.com",
+      "clientId": "cadence"
+    },
+    {
+      "name": "Cadence Group Dev",
+      "url": "https://dev.cadence-group.com",
+      "clientId": "cadence"
+    },
+    {
+      "name": "Our Pals Place",
+      "url": "https://ourpalsplace.com",
+      "clientId": "ops-pals-place"
+    },
+    {
+      "name": "OPP Subdomain",
+      "url": "https://opp.ourpalsplace.com",
+      "clientId": "ops-pals-place"
+    },
+    {
+      "name": "DBT Our Pals Place",
+      "url": "https://dbt.ourpalsplace.com",
+      "clientId": "ops-pals-place"
+    },
+    {
+      "name": "Vine and Vision Consulting",
+      "url": "https://vineandvisionconsulting.com",
       "clientId": null
+    },
+    {
+      "name": "Sages CNC",
+      "url": "https://sagescnc.com",
+      "clientId": null
+    },
+    {
+      "name": "Uptown Life Group",
+      "url": "https://uptownlifegroup.com",
+      "clientId": "uptown-life-group"
+    },
+    {
+      "name": "Uptown Life Group Events",
+      "url": "http://events.uptownlifegroup.com",
+      "clientId": "uptown-life-group"
+    },
+    {
+      "name": "The Loft",
+      "url": "https://theloft.com",
+      "clientId": "uptown-life-group"
+    },
+    {
+      "name": "Mabellas",
+      "url": "https://mabellas.com",
+      "clientId": "uptown-life-group"
+    },
+    {
+      "name": "Salt Cellar",
+      "url": "https://saltcellar.com",
+      "clientId": "uptown-life-group"
+    },
+    {
+      "name": "The Mix Market",
+      "url": "https://themixmarket.com",
+      "clientId": "uptown-life-group"
+    },
+    {
+      "name": "Tommy G's",
+      "url": "http://tommygs.com",
+      "clientId": "uptown-life-group"
     }
   ],
   "checkIntervalMinutes": 5,
