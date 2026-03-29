@@ -1,7 +1,14 @@
 const chromium = require('@sparticuz/chromium');
 const puppeteer = require('puppeteer-core');
 const { PNG } = require('pngjs');
-const pixelmatch = require('pixelmatch');
+
+let _pixelmatch;
+async function getPixelmatch() {
+  if (!_pixelmatch) {
+    _pixelmatch = (await import('pixelmatch')).default;
+  }
+  return _pixelmatch;
+}
 
 /**
  * Take a screenshot of a website
@@ -64,13 +71,14 @@ async function takeScreenshot(url, options = {}) {
 /**
  * Compare two screenshots and return difference percentage
  */
-function compareScreenshots(baseline, current) {
+async function compareScreenshots(baseline, current) {
   try {
+    const pixelmatch = await getPixelmatch();
     const baselineImg = PNG.sync.read(baseline);
     const currentImg = PNG.sync.read(current);
 
     const { width, height } = baselineImg;
-    
+
     // Images must be same size
     if (currentImg.width !== width || currentImg.height !== height) {
       return {
@@ -133,7 +141,7 @@ async function visualCheck(url, baseline, options = {}) {
   }
 
   // Compare with baseline
-  const comparison = compareScreenshots(baseline, screenshot.screenshot);
+  const comparison = await compareScreenshots(baseline, screenshot.screenshot);
   
   if (!comparison.success) {
     return {
