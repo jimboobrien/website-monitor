@@ -30,7 +30,7 @@
           "id": "3.1",
           "title": "Create dashboard data API endpoint",
           "description": "Build Netlify function to serve monitor status data from storage",
-          "status": "pending",
+          "status": "completed",
           "files": [
             "netlify/functions/dashboard-data.js",
             "netlify/functions/lib/dashboard-service.js"
@@ -47,7 +47,7 @@
           "id": "3.2",
           "title": "Build React dashboard app structure",
           "description": "Set up React app with routing and state management",
-          "status": "pending",
+          "status": "completed",
           "files": [
             "public/dashboard/index.html",
             "public/dashboard/app.jsx",
@@ -72,7 +72,7 @@
           "id": "3.3",
           "title": "Monitor list view component",
           "description": "Display all monitors with status indicators",
-          "status": "pending",
+          "status": "completed",
           "files": [
             "public/dashboard/components/MonitorList.jsx",
             "public/dashboard/components/MonitorCard.jsx",
@@ -113,7 +113,7 @@
           "id": "3.5",
           "title": "Global stats dashboard",
           "description": "Overview dashboard with aggregate statistics",
-          "status": "pending",
+          "status": "completed",
           "files": [
             "public/dashboard/components/Dashboard.jsx",
             "public/dashboard/components/StatCard.jsx",
