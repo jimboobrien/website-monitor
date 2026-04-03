@@ -5,3 +5,19 @@
 
 [dev]
   framework = "#static"
+
+# Scheduled Functions
+[functions]
+  node_bundler = "esbuild"
+
+# Enable scheduled functions via cron plugin
+[[plugins]]
+  package = "@netlify/plugin-functions-cron"
+
+# Basic HTTP monitoring - runs every 5 minutes
+[functions."monitor"]
+  schedule = "*/5 * * * *"
+
+# Enhanced monitoring (visual + custom checks) - runs every 10 minutes
+[functions."monitor-enhanced"]
+  schedule = "*/10 * * * *"
