@@ -10,14 +10,16 @@
 [functions]
   node_bundler = "esbuild"
 
-# Enable scheduled functions via cron plugin
-[[plugins]]
-  package = "@netlify/plugin-functions-cron"
+# Scheduled functions DISABLED until Supabase migration is complete
+# Re-enable after updating monitor functions to save to Supabase database
 
-# Basic HTTP monitoring - runs every 5 minutes
-[functions."monitor"]
-  schedule = "*/5 * * * *"
+# [[plugins]]
+#   package = "@netlify/plugin-functions-cron"
 
-# Enhanced monitoring (visual + custom checks) - runs every 10 minutes
-[functions."monitor-enhanced"]
-  schedule = "*/10 * * * *"
+# # Basic HTTP monitoring - runs every 5 minutes
+# [functions."monitor"]
+#   schedule = "*/5 * * * *"
+
+# # Enhanced monitoring (visual + custom checks) - runs every 10 minutes
+# [functions."monitor-enhanced"]
+#   schedule = "*/10 * * * *"

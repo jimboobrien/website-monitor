@@ -11,8 +11,6 @@
  * GET /.netlify/functions/dashboard-data?action=uptime-history&id=website-id&days=7
  */
 
-const fs = require('fs').promises;
-const path = require('path');
 const {
   getMonitorStats,
   getAllMonitorStats,
@@ -20,19 +18,9 @@ const {
   getMonitorsByClient,
   getResponseTimeHistory,
   getUptimeHistory
-} = require('./lib/dashboard-service');
+} = require('./lib/dashboard-service-supabase');
 
-// Load configuration
-async function loadConfig() {
-  try {
-    const configPath = path.join(__dirname, '../../config.json');
-    const configData = await fs.readFile(configPath, 'utf8');
-    return JSON.parse(configData);
-  } catch (error) {
-    console.error('Error loading config:', error);
-    throw new Error('Configuration file not found or invalid');
-  }
-}
+// No longer need config.json - all config comes from Supabase
 
 // CORS headers for browser requests
 const headers = {
@@ -64,13 +52,11 @@ exports.handler = async (event, context) => {
   try {
     const params = event.queryStringParameters || {};
     const action = params.action || 'overview';
-    
-    const config = await loadConfig();
 
     switch (action) {
       case 'overview': {
         // Get all monitor stats and global statistics
-        const monitorStats = await getAllMonitorStats(config);
+        const monitorStats = await getAllMonitorStats();
         const globalStats = getGlobalStats(monitorStats);
         
         return {
@@ -88,7 +74,7 @@ exports.handler = async (event, context) => {
 
       case 'monitors': {
         // Get all monitors with their statistics
-        const monitorStats = await getAllMonitorStats(config);
+        const monitorStats = await getAllMonitorStats();
         
         // Optional: filter by client
         const clientId = params.client;
@@ -118,20 +104,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        const website = config.websites.find(w => {
-          const id = w.id || w.url.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-          return id === monitorId;
-        });
-        
-        if (!website) {
-          return {
-            statusCode: 404,
-            headers,
-            body: JSON.stringify({ error: 'Monitor not found' })
-          };
-        }
-        
-        const stats = await getMonitorStats(monitorId, website);
+        const stats = await getMonitorStats(monitorId);
         
         return {
           statusCode: 200,
@@ -146,8 +119,8 @@ exports.handler = async (event, context) => {
 
       case 'clients': {
         // Get monitors grouped by client
-        const monitorStats = await getAllMonitorStats(config);
-        const byClient = getMonitorsByClient(monitorStats, config.clients);
+        const monitorStats = await getAllMonitorStats();
+        const byClient = await getMonitorsByClient(monitorStats);
         
         return {
           statusCode: 200,
