@@ -133,11 +133,196 @@
     },
     {
       "id": "phase-4",
-      "name": "Monitor Management",
+      "name": "Database Migration & Monitor Management",
       "branch": "phase-4-management",
       "status": "pending",
-      "description": "CRUD operations for monitors, clients, and settings",
+      "description": "Migrate to Supabase for persistent storage, then add CRUD operations for monitors, clients, and settings",
+      "prerequisites": [
+        "Supabase project created",
+        "Environment variables configured (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY)"
+      ],
       "tasks": [
+        {
+          "id": "4.0.1",
+          "title": "Supabase database schema",
+          "description": "Design and create PostgreSQL schema for monitors, checks, incidents, and configuration",
+          "status": "pending",
+          "priority": "critical",
+          "blocksOtherTasks": true,
+          "files": [
+            "supabase/schema.sql",
+            "supabase/seed.sql",
+            "supabase/migrations/"
+          ],
+          "schema": {
+            "tables": [
+              "websites - Monitor configuration (replaces config.json)",
+              "clients - Client/customer information",
+              "monitor_checks - Time-series check results",
+              "incidents - Aggregated downtime events",
+              "visual_baselines - Metadata for baseline screenshots",
+              "alert_history - Email/notification log"
+            ],
+            "indexes": [
+              "idx_checks_website_timestamp - Fast time-series queries",
+              "idx_incidents_website_started - Incident lookups",
+              "idx_checks_status - Status filtering"
+            ],
+            "functions": [
+              "calculate_uptime(website_id, hours) - Server-side uptime calc",
+              "get_recent_incidents(website_id, limit) - Fast incident queries"
+            ]
+          },
+          "features": [
+            "Monitor configuration table (name, url, client_id, settings)",
+            "Time-series checks table (optimized for inserts)",
+            "Incidents table with start/end timestamps",
+            "Client management table",
+            "Indexes for fast queries",
+            "Foreign key constraints for data integrity",
+            "Partitioning for check data (future optimization)"
+          ]
+        },
+        {
+          "id": "4.0.2",
+          "title": "Supabase Storage setup",
+          "description": "Configure Storage buckets for screenshots and baselines",
+          "status": "pending",
+          "priority": "critical",
+          "blocksOtherTasks": true,
+          "files": [
+            "supabase/storage-policies.sql"
+          ],
+          "features": [
+            "Create 'baselines' bucket for visual comparison images",
+            "Create 'screenshots' bucket for snapshots",
+            "Set up RLS policies for security",
+            "Configure public URL access for images",
+            "Set retention policies (auto-delete old snapshots)"
+          ]
+        },
+        {
+          "id": "4.0.3",
+          "title": "Supabase client library",
+          "description": "Create reusable Supabase client and helper functions",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": ["4.0.1", "4.0.2"],
+          "files": [
+            "netlify/functions/lib/supabase-client.js",
+            "netlify/functions/lib/supabase-storage.js"
+          ],
+          "features": [
+            "Initialize Supabase client with env vars",
+            "Connection pooling and error handling",
+            "Helper functions for common queries",
+            "Storage upload/download helpers",
+            "Query builders for time-series data",
+            "Transaction support for atomic operations"
+          ]
+        },
+        {
+          "id": "4.0.4",
+          "title": "Migrate storage.js to Supabase",
+          "description": "Replace file-based storage with Supabase database and storage",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": ["4.0.3"],
+          "files": [
+            "netlify/functions/lib/storage.js - Rewrite",
+            "netlify/functions/lib/supabase-queries.js - New"
+          ],
+          "features": [
+            "Replace saveHistory() with Supabase insert",
+            "Replace loadHistory() with Supabase query",
+            "Replace baseline storage with Supabase Storage",
+            "Add batch insert for multiple checks",
+            "Add uptime calculation queries",
+            "Keep same API interface for backward compatibility",
+            "Add migration function for existing /tmp/ data"
+          ]
+        },
+        {
+          "id": "4.0.5",
+          "title": "Migrate config.json to database",
+          "description": "Move website and client configuration from JSON file to Supabase",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": ["4.0.4"],
+          "files": [
+            "netlify/functions/lib/config-loader.js - Rewrite",
+            "netlify/functions/config-migration.js - One-time script"
+          ],
+          "features": [
+            "Load websites from 'websites' table instead of config.json",
+            "Load clients from 'clients' table",
+            "Cache configuration in memory (5 min TTL)",
+            "Fallback to config.json if database unavailable",
+            "Migration script to import existing config.json",
+            "Keep config.json as backup/reference"
+          ]
+        },
+        {
+          "id": "4.0.6",
+          "title": "Update monitor functions to use Supabase",
+          "description": "Modify monitor.js and monitor-enhanced.js to write to Supabase",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": ["4.0.4", "4.0.5"],
+          "files": [
+            "netlify/functions/monitor.js - Update",
+            "netlify/functions/monitor-enhanced.js - Update"
+          ],
+          "features": [
+            "Save check results to monitor_checks table",
+            "Save baselines to Supabase Storage",
+            "Create incidents on failure",
+            "Auto-resolve incidents on recovery",
+            "Batch insert for performance",
+            "Error handling and retries"
+          ]
+        },
+        {
+          "id": "4.0.7",
+          "title": "Update dashboard API to use Supabase",
+          "description": "Rewrite dashboard-data.js to query Supabase instead of file storage",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": ["4.0.4"],
+          "files": [
+            "netlify/functions/dashboard-data.js - Rewrite",
+            "netlify/functions/lib/dashboard-service.js - Update queries"
+          ],
+          "features": [
+            "Rewrite overview query with SQL aggregation",
+            "Rewrite monitor stats with joins and GROUP BY",
+            "Optimize response-time query (indexed timestamp)",
+            "Optimize uptime-history with date_trunc",
+            "Add caching for frequently accessed data",
+            "5-10x faster dashboard load times"
+          ]
+        },
+        {
+          "id": "4.0.8",
+          "title": "Testing and validation",
+          "description": "Comprehensive testing of Supabase migration",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": ["4.0.6", "4.0.7"],
+          "files": [
+            "test-supabase.js",
+            "SUPABASE-MIGRATION.md"
+          ],
+          "features": [
+            "Test monitor check storage and retrieval",
+            "Test dashboard API performance",
+            "Verify data persistence across deploys",
+            "Load testing with realistic data",
+            "Verify visual baselines work",
+            "Test incident creation and resolution",
+            "Document migration process"
+          ]
+        },
         {
           "id": "4.1",
           "title": "Monitor CRUD API endpoints",
@@ -430,18 +615,21 @@
       "tasks": [
         {
           "id": "7.1",
-          "title": "Historical data storage",
-          "description": "Implement persistent data storage",
+          "title": "Data retention and archiving",
+          "description": "Implement data retention policies and archiving for long-term storage",
           "status": "pending",
+          "note": "Database migration completed in Phase 4 - this task is about optimization",
           "files": [
-            "netlify/functions/lib/data-store.js"
+            "netlify/functions/lib/data-archiver.js",
+            "supabase/retention-policies.sql"
           ],
           "features": [
-            "Move from /tmp to Netlify Blobs or S3",
-            "Store check results long-term",
-            "Aggregate daily/weekly/monthly stats",
-            "Data retention policies",
-            "Export to CSV/JSON"
+            "Archive old check data (>90 days) to separate table",
+            "Aggregate daily/weekly/monthly stats into summary tables",
+            "Data retention policies (auto-delete after X days)",
+            "Export historical data to CSV/JSON",
+            "Compress old snapshots",
+            "Table partitioning for performance"
           ]
         },
         {
@@ -510,19 +698,22 @@
         {
           "id": "8.1",
           "title": "Authentication system",
-          "description": "User login and session management",
+          "description": "User login and session management using Supabase Auth",
           "status": "pending",
+          "note": "Uses Supabase Auth (already integrated in Phase 4) - just add UI and RLS policies",
           "files": [
-            "netlify/functions/auth/login.js",
-            "netlify/functions/auth/register.js",
-            "netlify/functions/lib/auth-middleware.js"
+            "public/dashboard/components/Login.jsx",
+            "public/dashboard/components/Register.jsx",
+            "netlify/functions/lib/auth-middleware.js",
+            "supabase/auth-policies.sql"
           ],
           "features": [
-            "Email/password authentication",
-            "JWT token management",
-            "Password reset flow",
-            "Session management",
-            "OAuth integration (Google, GitHub)"
+            "Email/password authentication (Supabase Auth)",
+            "Magic link login",
+            "Password reset flow (built-in)",
+            "Session management (automatic)",
+            "OAuth integration (Google, GitHub) - Supabase built-in",
+            "Row-level security policies"
           ]
         },
         {
@@ -693,9 +884,11 @@
     },
     "backend": {
       "functions": "Netlify Functions (Node.js)",
-      "storage": "File-based -> Netlify Blobs (Phase 7)",
-      "auth": "JWT + Netlify Identity (Phase 8)",
-      "email": "SendGrid (existing)"
+      "database": "Supabase (PostgreSQL) - Phase 4",
+      "storage": "Supabase Storage for images/files",
+      "auth": "Supabase Auth (Phase 8)",
+      "email": "SendGrid (existing)",
+      "caching": "In-memory + /tmp/ for function-level cache"
     },
     "deployment": {
       "platform": "Netlify",
@@ -704,10 +897,10 @@
     }
   },
   "nextSteps": [
-    "Review and approve this tasks.json structure",
-    "Create phase-3-dashboard branch",
-    "Start with task 3.1: Create dashboard data API endpoint",
-    "Build task 3.2: Set up React dashboard structure",
-    "Implement task 3.3: Monitor list view"
+    "✅ Phase 3 Complete - Dashboard UI is live!",
+    "→ User creates Supabase project and provides credentials",
+    "→ Start Phase 4 with Supabase migration (tasks 4.0.1-4.0.8)",
+    "→ Then continue with Monitor Management (tasks 4.1-4.5)",
+    "→ Merge phase-3-dashboard to main and deploy"
   ]
 }
