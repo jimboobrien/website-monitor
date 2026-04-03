@@ -1,5 +1,6 @@
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useMemo } = React;
 const { formatDistanceToNow, format } = dateFns;
+const { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
 
 // API Base URL - adjust for your deployment
 const API_BASE = '/.netlify/functions/dashboard-data';
@@ -43,7 +44,8 @@ function StatCard({ title, value, subtitle, icon, color = 'blue' }) {
     blue: 'bg-blue-500',
     green: 'bg-green-500',
     red: 'bg-red-500',
-    gray: 'bg-gray-500'
+    gray: 'bg-gray-500',
+    purple: 'bg-purple-500'
   };
   
   return (
@@ -61,6 +63,365 @@ function StatCard({ title, value, subtitle, icon, color = 'blue' }) {
             {icon}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Response Time Chart Component
+function ResponseTimeChart({ monitorId }) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState(24);
+  
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const history = await fetchDashboardData('response-time', { id: monitorId, hours: timeRange });
+        
+        // Format data for Recharts
+        const formattedData = history.map(item => ({
+          time: format(new Date(item.timestamp), 'HH:mm'),
+          responseTime: item.responseTime,
+          status: item.status
+        }));
+        
+        setData(formattedData);
+      } catch (error) {
+        console.error('Error loading response time data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
+  }, [monitorId, timeRange]);
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+  
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        No response time data available
+      </div>
+    );
+  }
+  
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">Response Time</h3>
+        <select
+          value={timeRange}
+          onChange={(e) => setTimeRange(Number(e.target.value))}
+          className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={6}>Last 6 hours</option>
+          <option value={12}>Last 12 hours</option>
+          <option value={24}>Last 24 hours</option>
+          <option value={48}>Last 48 hours</option>
+        </select>
+      </div>
+      
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="time" 
+            tick={{ fontSize: 12 }}
+            interval={Math.floor(data.length / 10)}
+          />
+          <YAxis 
+            label={{ value: 'Response Time (ms)', angle: -90, position: 'insideLeft' }}
+            tick={{ fontSize: 12 }}
+          />
+          <Tooltip 
+            contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+            formatter={(value) => [`${value}ms`, 'Response Time']}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="responseTime" 
+            stroke="#3b82f6" 
+            strokeWidth={2}
+            dot={false}
+            name="Response Time"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Uptime Chart Component
+function UptimeChart({ monitorId }) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState(7);
+  
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const history = await fetchDashboardData('uptime-history', { id: monitorId, days: timeRange });
+        
+        // Format data for Recharts
+        const formattedData = history.map(item => ({
+          date: format(new Date(item.date), 'MMM dd'),
+          uptime: item.uptime,
+          checks: item.checks
+        }));
+        
+        setData(formattedData);
+      } catch (error) {
+        console.error('Error loading uptime data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
+  }, [monitorId, timeRange]);
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+  
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        No uptime data available
+      </div>
+    );
+  }
+  
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">Daily Uptime</h3>
+        <select
+          value={timeRange}
+          onChange={(e) => setTimeRange(Number(e.target.value))}
+          className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={7}>Last 7 days</option>
+          <option value={14}>Last 14 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+        </select>
+      </div>
+      
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="date" 
+            tick={{ fontSize: 12 }}
+          />
+          <YAxis 
+            domain={[0, 100]}
+            label={{ value: 'Uptime %', angle: -90, position: 'insideLeft' }}
+            tick={{ fontSize: 12 }}
+          />
+          <Tooltip 
+            contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+            formatter={(value, name, props) => {
+              if (name === 'uptime') {
+                return [`${value.toFixed(2)}%`, 'Uptime'];
+              }
+              return [value, name];
+            }}
+          />
+          <Bar 
+            dataKey="uptime" 
+            fill="#10b981"
+            name="Uptime"
+            radius={[4, 4, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Monitor Detail Component
+function MonitorDetail({ monitor, onBack }) {
+  const uptimeColor = monitor.uptime['24h'] >= 99 ? 'text-green-600' : 
+                      monitor.uptime['24h'] >= 95 ? 'text-yellow-600' : 
+                      'text-red-600';
+  
+  const lastCheckText = monitor.lastCheck 
+    ? formatDistanceToNow(new Date(monitor.lastCheck), { addSuffix: true })
+    : 'Never';
+  
+  return (
+    <div>
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            onClick={onBack}
+            className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+          >
+            ← Back
+          </button>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gray-900">{monitor.name}</h2>
+            <a 
+              href={monitor.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline"
+            >
+              {monitor.url} ↗
+            </a>
+          </div>
+          <StatusBadge status={monitor.currentStatus} />
+        </div>
+        
+        <div className="flex items-center gap-4 text-sm text-gray-600">
+          <span>Last checked: {lastCheckText}</span>
+          <span>•</span>
+          <span>Client: {monitor.clientId || 'Uncategorized'}</span>
+          {monitor.features.visualCheck && (
+            <>
+              <span>•</span>
+              <span className="text-purple-600">📸 Visual Monitoring</span>
+            </>
+          )}
+          {monitor.features.customChecks > 0 && (
+            <>
+              <span>•</span>
+              <span className="text-blue-600">✓ {monitor.features.customChecks} Custom Checks</span>
+            </>
+          )}
+        </div>
+      </div>
+      
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <StatCard
+          title="Uptime (24h)"
+          value={`${monitor.uptime['24h'].toFixed(2)}%`}
+          subtitle={`${monitor.totalChecks} total checks`}
+          color={monitor.uptime['24h'] >= 99 ? 'green' : monitor.uptime['24h'] >= 95 ? 'gray' : 'red'}
+        />
+        
+        <StatCard
+          title="Uptime (7d)"
+          value={`${monitor.uptime['7d'].toFixed(2)}%`}
+          subtitle="Last 7 days"
+          color="blue"
+        />
+        
+        <StatCard
+          title="Uptime (30d)"
+          value={`${monitor.uptime['30d'].toFixed(2)}%`}
+          subtitle="Last 30 days"
+          color="blue"
+        />
+        
+        <StatCard
+          title="Avg Response"
+          value={`${monitor.responseTime.avg24h}ms`}
+          subtitle={`Current: ${monitor.responseTime.current}ms`}
+          color="purple"
+        />
+      </div>
+      
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <ResponseTimeChart monitorId={monitor.websiteId} />
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-6">
+          <UptimeChart monitorId={monitor.websiteId} />
+        </div>
+      </div>
+      
+      {/* Recent Incidents */}
+      {monitor.recentIncidents.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Recent Incidents ({monitor.recentIncidents.length})
+          </h3>
+          <div className="space-y-3">
+            {monitor.recentIncidents.map((incident, idx) => (
+              <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className={`w-2 h-2 rounded-full mt-2 ${
+                  incident.type === 'down' ? 'bg-red-500' : 'bg-yellow-500'
+                }`}></div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">
+                      {incident.type === 'down' ? '🔴 Monitor Down' : '⚠️ Issues Detected'}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {format(new Date(incident.timestamp), 'MMM dd, yyyy HH:mm')}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{incident.message}</p>
+                  {incident.issues && incident.issues.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {incident.issues.map((issue, i) => (
+                        <li key={i} className="text-xs text-gray-500 ml-4">
+                          • {issue.type}: {issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Actions */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => alert('Manual check coming in Phase 4!')}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+          >
+            🔄 Check Now
+          </button>
+          <button
+            onClick={() => alert('Edit monitor coming in Phase 4!')}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+          >
+            ✏️ Edit
+          </button>
+          <button
+            onClick={() => alert('Pause/Resume coming in Phase 4!')}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+          >
+            ⏸️ Pause
+          </button>
+          <button
+            onClick={() => {
+              if (confirm('Delete this monitor? This action cannot be undone.')) {
+                alert('Delete coming in Phase 4!');
+              }
+            }}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+          >
+            🗑️ Delete
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -294,7 +655,8 @@ function DashboardOverview({ globalStats, monitors }) {
 
 // Main App Component
 function App() {
-  const [view, setView] = useState('overview'); // 'overview' or 'monitors'
+  const [view, setView] = useState('overview'); // 'overview', 'monitors', or 'detail'
+  const [selectedMonitor, setSelectedMonitor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [globalStats, setGlobalStats] = useState(null);
@@ -328,17 +690,32 @@ function App() {
     loadData();
   }, [loadData]);
   
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 30 seconds (but not on detail view to avoid disrupting chart interactions)
   useEffect(() => {
+    if (view === 'detail') return; // Don't auto-refresh on detail page
+    
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [loadData, view]);
   
-  // Handle monitor selection (for future detail view)
-  const handleSelectMonitor = (monitor) => {
-    console.log('Selected monitor:', monitor);
-    // TODO: Navigate to monitor detail view
-    alert(`Monitor detail view coming soon!\n\n${monitor.name}\n${monitor.url}`);
+  // Handle monitor selection
+  const handleSelectMonitor = async (monitor) => {
+    // Fetch fresh data for the selected monitor
+    try {
+      const freshData = await fetchDashboardData('monitor', { id: monitor.websiteId });
+      setSelectedMonitor(freshData);
+      setView('detail');
+    } catch (err) {
+      console.error('Error loading monitor detail:', err);
+      alert('Failed to load monitor details: ' + err.message);
+    }
+  };
+  
+  // Handle back from detail
+  const handleBackFromDetail = () => {
+    setSelectedMonitor(null);
+    setView('monitors');
+    loadData(); // Refresh data when going back
   };
   
   if (loading && !globalStats) {
@@ -399,28 +776,30 @@ function App() {
           </div>
           
           {/* Navigation */}
-          <nav className="mt-4 flex gap-4 border-b border-gray-200">
-            <button
-              onClick={() => setView('overview')}
-              className={`pb-2 px-1 font-medium text-sm ${
-                view === 'overview'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setView('monitors')}
-              className={`pb-2 px-1 font-medium text-sm ${
-                view === 'monitors'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Monitors ({monitors.length})
-            </button>
-          </nav>
+          {view !== 'detail' && (
+            <nav className="mt-4 flex gap-4 border-b border-gray-200">
+              <button
+                onClick={() => setView('overview')}
+                className={`pb-2 px-1 font-medium text-sm ${
+                  view === 'overview'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setView('monitors')}
+                className={`pb-2 px-1 font-medium text-sm ${
+                  view === 'monitors'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Monitors ({monitors.length})
+              </button>
+            </nav>
+          )}
         </div>
       </header>
       
@@ -437,6 +816,13 @@ function App() {
           <MonitorList
             monitors={monitors}
             onSelectMonitor={handleSelectMonitor}
+          />
+        )}
+        
+        {view === 'detail' && selectedMonitor && (
+          <MonitorDetail
+            monitor={selectedMonitor}
+            onBack={handleBackFromDetail}
           />
         )}
       </main>
