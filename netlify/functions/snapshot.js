@@ -1,229 +1,166 @@
-const { takeSnapshot, saveSnapshot, listSnapshots, getSnapshot } = require('./lib/snapshot');
-const config = require('../../config.json');
+const { takeSnapshot } = require('./lib/snapshot');
+const {
+  getWebsite,
+  getAllWebsites,
+  uploadScreenshot,
+  getSupabaseClient
+} = require('./lib/supabase');
+
+const headers = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Content-Type': 'application/json'
+};
 
 /**
- * Snapshot function - Take and manage website snapshots
- * 
- * Actions:
- * - capture: Take a new snapshot of a website
- * - list: List all snapshots for a website
- * - view: View a specific snapshot
+ * Snapshot function - Take and manage website snapshots (Supabase-backed)
+ *
+ * POST/GET ?action=capture&websiteId=xxx  — take a new snapshot
+ * GET      ?action=list&websiteId=xxx     — list snapshots for a website
+ * GET      ?action=list                   — list all websites
  */
 exports.handler = async (event, context) => {
-  const { httpMethod, queryStringParameters = {} } = event;
-  
-  // Only allow GET and POST
-  if (httpMethod !== 'GET' && httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
   }
-  
-  const action = queryStringParameters.action || 'list';
-  const websiteId = queryStringParameters.websiteId || queryStringParameters.id;
-  const timestamp = queryStringParameters.timestamp;
-  
+
+  const params = event.queryStringParameters || {};
+  const action = params.action || 'list';
+  const websiteId = params.websiteId || params.id;
+
   try {
     switch (action) {
       case 'capture': {
         if (!websiteId) {
           return {
             statusCode: 400,
+            headers,
             body: JSON.stringify({ error: 'websiteId is required' })
           };
         }
-        
-        // Find website in config
-        const website = config.websites.find(w => 
-          (w.id || w.name.toLowerCase().replace(/\s+/g, '-')) === websiteId
-        );
-        
-        if (!website) {
+
+        let website;
+        try {
+          website = await getWebsite(websiteId);
+        } catch (err) {
           return {
             statusCode: 404,
-            body: JSON.stringify({ error: 'Website not found in config' })
+            headers,
+            body: JSON.stringify({ error: `Website '${websiteId}' not found` })
           };
         }
-        
-        console.log(`Taking snapshot of ${website.name}...`);
-        
+
+        console.log(`[SNAPSHOT] Capturing ${website.name} (${website.url})...`);
+
         const snapshot = await takeSnapshot(website.url, {
           captureScreenshot: true,
-          captureHTML: true,
+          captureHTML: false,
           fullPage: false
         });
-        
+
         if (!snapshot.success) {
+          console.error(`[SNAPSHOT] Failed for ${website.name}: ${snapshot.error}`);
           return {
             statusCode: 500,
-            body: JSON.stringify({ 
-              error: 'Snapshot failed',
-              details: snapshot.error 
-            })
+            headers,
+            body: JSON.stringify({ error: 'Snapshot failed', detail: snapshot.error })
           };
         }
-        
-        const saved = await saveSnapshot(websiteId, snapshot);
-        
+
+        // Save screenshot to Supabase Storage
+        let screenshotUrl = null;
+        if (snapshot.screenshot) {
+          const filename = `snapshot-${Date.now()}.png`;
+          const result = await uploadScreenshot(websiteId, snapshot.screenshot, filename);
+          screenshotUrl = result.publicUrl;
+          console.log(`[SNAPSHOT] Saved ${website.name} screenshot: ${filename}`);
+        }
+
         return {
           statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             success: true,
-            action: 'capture',
             websiteId,
-            websiteName: website.name,
-            timestamp: snapshot.timestamp,
-            saved: saved.success,
+            name: website.name,
+            url: website.url,
+            screenshotUrl,
             metadata: snapshot.metadata,
-            htmlSize: snapshot.htmlSize
-          }, null, 2)
+            timestamp: snapshot.timestamp
+          })
         };
       }
-      
+
       case 'list': {
         if (!websiteId) {
-          // List all websites with snapshot capability
-          const websites = config.websites.map(w => ({
-            id: w.id || w.name.toLowerCase().replace(/\s+/g, '-'),
-            name: w.name,
-            url: w.url,
-            clientId: w.clientId
-          }));
-          
+          // List all websites
+          const websites = await getAllWebsites();
           return {
             statusCode: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
-              action: 'list-websites',
-              websites,
-              hint: 'Add ?action=list&websiteId=YOUR_ID to see snapshots for a specific website'
-            }, null, 2)
-          };
-        }
-        
-        const list = await listSnapshots(websiteId);
-        
-        if (!list.success) {
-          return {
-            statusCode: 500,
-            body: JSON.stringify({ 
-              error: 'Failed to list snapshots',
-              details: list.error 
+              success: true,
+              websites: websites.map(w => ({
+                id: w.id,
+                name: w.name,
+                url: w.url,
+                clientId: w.client_id
+              }))
             })
           };
         }
-        
+
+        // List screenshots for a website from Supabase Storage
+        const supabase = getSupabaseClient();
+        const { data: files, error } = await supabase.storage
+          .from('screenshots')
+          .list(websiteId, { sortBy: { column: 'created_at', order: 'desc' }, limit: 50 });
+
+        if (error) throw error;
+
+        const snapshots = (files || [])
+          .filter(f => f.name.startsWith('snapshot-') && f.name.endsWith('.png'))
+          .map(f => {
+            const { data: urlData } = supabase.storage
+              .from('screenshots')
+              .getPublicUrl(`${websiteId}/${f.name}`);
+            return {
+              name: f.name,
+              url: urlData.publicUrl,
+              createdAt: f.created_at,
+              size: f.metadata?.size || 0
+            };
+          });
+
         return {
           statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             success: true,
-            action: 'list',
             websiteId,
-            count: list.count,
-            snapshots: list.snapshots.map(s => ({
-              timestamp: s.timestamp,
-              date: s.date,
-              url: s.url,
-              title: s.metadata?.title,
-              hasScreenshot: s.hasScreenshot,
-              hasHTML: s.hasHTML
-            }))
-          }, null, 2)
+            count: snapshots.length,
+            snapshots
+          })
         };
       }
-      
-      case 'view': {
-        if (!websiteId || !timestamp) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ 
-              error: 'websiteId and timestamp are required',
-              example: '?action=view&websiteId=my-site&timestamp=1234567890'
-            })
-          };
-        }
-        
-        const result = await getSnapshot(websiteId, timestamp);
-        
-        if (!result.success) {
-          return {
-            statusCode: 404,
-            body: JSON.stringify({ 
-              error: 'Snapshot not found',
-              details: result.error 
-            })
-          };
-        }
-        
-        const format = queryStringParameters.format || 'json';
-        
-        if (format === 'html' && result.snapshot.html) {
-          return {
-            statusCode: 200,
-            headers: { 'Content-Type': 'text/html' },
-            body: result.snapshot.html
-          };
-        }
-        
-        if (format === 'png' && result.snapshot.screenshot) {
-          return {
-            statusCode: 200,
-            headers: { 
-              'Content-Type': 'image/png',
-              'Content-Disposition': `inline; filename="${websiteId}-${timestamp}.png"`
-            },
-            body: result.snapshot.screenshot.toString('base64'),
-            isBase64Encoded: true
-          };
-        }
-        
-        // Default: JSON metadata
-        return {
-          statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            success: true,
-            action: 'view',
-            websiteId,
-            timestamp,
-            snapshot: {
-              ...result.snapshot,
-              screenshot: result.snapshot.screenshot ? '[binary data]' : null,
-              html: result.snapshot.html ? `${result.snapshot.html.length} bytes` : null
-            },
-            viewOptions: {
-              html: `?action=view&websiteId=${websiteId}&timestamp=${timestamp}&format=html`,
-              png: `?action=view&websiteId=${websiteId}&timestamp=${timestamp}&format=png`
-            }
-          }, null, 2)
-        };
-      }
-      
+
       default:
         return {
           statusCode: 400,
-          body: JSON.stringify({ 
+          headers,
+          body: JSON.stringify({
             error: 'Unknown action',
-            validActions: ['capture', 'list', 'view'],
-            examples: [
-              '?action=capture&websiteId=my-site',
-              '?action=list&websiteId=my-site',
-              '?action=view&websiteId=my-site&timestamp=1234567890&format=html'
-            ]
+            validActions: ['capture', 'list']
           })
         };
     }
   } catch (error) {
-    console.error('Snapshot function error:', error);
+    console.error('[SNAPSHOT] Error:', error.message);
     return {
       statusCode: 500,
-      body: JSON.stringify({ 
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      })
+      headers,
+      body: JSON.stringify({ error: error.message })
     };
   }
 };

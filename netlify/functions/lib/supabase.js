@@ -5,6 +5,11 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
+// Environment identifier — defaults to 'production' on Netlify
+function getEnvironment() {
+  return process.env.MONITOR_ENV || 'production';
+}
+
 // Initialize Supabase client
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -68,6 +73,101 @@ async function updateWebsite(websiteId, updates) {
   
   if (error) throw error;
   return data;
+}
+
+async function deleteMonitorCheck(checkId) {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from('monitor_checks')
+    .delete()
+    .eq('id', checkId);
+
+  if (error) throw error;
+}
+
+async function deleteIncident(incidentId) {
+  const supabase = getSupabaseClient();
+
+  // Get the incident details first so we can delete associated failed checks
+  const { data: incident, error: fetchError } = await supabase
+    .from('incidents')
+    .select('*')
+    .eq('id', incidentId)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  // Delete failed monitor checks during the incident window
+  const startTime = incident.started_at;
+  const endTime = incident.resolved_at || new Date().toISOString();
+
+  await supabase
+    .from('monitor_checks')
+    .delete()
+    .eq('website_id', incident.website_id)
+    .gte('timestamp', startTime)
+    .lte('timestamp', endTime)
+    .neq('status', 'up');
+
+  // Delete the incident itself
+  const { error } = await supabase
+    .from('incidents')
+    .delete()
+    .eq('id', incidentId);
+
+  if (error) throw error;
+}
+
+async function deleteAllIncidents(websiteId) {
+  const supabase = getSupabaseClient();
+
+  // Delete all failed checks for this website
+  await supabase
+    .from('monitor_checks')
+    .delete()
+    .eq('website_id', websiteId)
+    .neq('status', 'up');
+
+  // Delete all incidents
+  const { error } = await supabase
+    .from('incidents')
+    .delete()
+    .eq('website_id', websiteId);
+
+  if (error) throw error;
+}
+
+async function deleteEnvironmentData(env) {
+  const supabase = getSupabaseClient();
+
+  const { count: checksDeleted } = await supabase
+    .from('monitor_checks')
+    .delete({ count: 'exact' })
+    .eq('environment', env);
+
+  const { count: incidentsDeleted } = await supabase
+    .from('incidents')
+    .delete({ count: 'exact' })
+    .eq('environment', env);
+
+  return { checksDeleted: checksDeleted || 0, incidentsDeleted: incidentsDeleted || 0 };
+}
+
+async function deleteWebsite(websiteId) {
+  const supabase = getSupabaseClient();
+
+  // Delete related data first (foreign key constraints)
+  await supabase.from('monitor_checks').delete().eq('website_id', websiteId);
+  await supabase.from('incidents').delete().eq('website_id', websiteId);
+  await supabase.from('alert_history').delete().eq('website_id', websiteId);
+  await supabase.from('visual_baselines').delete().eq('website_id', websiteId);
+
+  const { error } = await supabase
+    .from('websites')
+    .delete()
+    .eq('id', websiteId);
+
+  if (error) throw error;
 }
 
 /**
@@ -138,7 +238,8 @@ async function saveMonitorCheck(check) {
       status_code: check.statusCode,
       error_message: check.error,
       issues: check.issues || [],
-      metadata: check.metadata || {}
+      metadata: check.metadata || {},
+      environment: getEnvironment()
     }])
     .select()
     .single();
@@ -147,41 +248,54 @@ async function saveMonitorCheck(check) {
   return data;
 }
 
-async function getMonitorChecks(websiteId, hours = 24, limit = 1000) {
+async function getMonitorChecks(websiteId, hours = 24, limit = 1000, { env } = {}) {
   const supabase = getSupabaseClient();
   const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-  
-  const { data, error } = await supabase
+
+  let query = supabase
     .from('monitor_checks')
     .select('*')
     .eq('website_id', websiteId)
     .gte('timestamp', cutoffTime)
     .order('timestamp', { ascending: false })
     .limit(limit);
+
+  if (env) {
+    query = query.eq('environment', env);
+  }
+
+  const { data, error } = await query;
   
   if (error) throw error;
   
   // Convert to legacy format for compatibility
   return (data || []).map(check => ({
+    id: check.id,
     websiteId: check.website_id,
     timestamp: new Date(check.timestamp).getTime(),
     status: check.status,
     responseTime: check.response_time,
     statusCode: check.status_code,
     error: check.error_message,
-    issues: check.issues || []
+    issues: check.issues || [],
+    environment: check.environment
   }));
 }
 
-async function getLatestCheck(websiteId) {
+async function getLatestCheck(websiteId, { env } = {}) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('monitor_checks')
     .select('*')
     .eq('website_id', websiteId)
     .order('timestamp', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
+
+  if (env) {
+    query = query.eq('environment', env);
+  }
+
+  const { data, error } = await query.single();
   
   if (error) {
     if (error.code === 'PGRST116') return null; // No rows found
@@ -195,7 +309,8 @@ async function getLatestCheck(websiteId) {
     responseTime: data.response_time,
     statusCode: data.status_code,
     error: data.error_message,
-    issues: data.issues || []
+    issues: data.issues || [],
+    metadata: data.metadata || {}
   };
 }
 
@@ -237,7 +352,8 @@ async function createIncident(incident) {
       incident_type: incident.type,
       severity: incident.severity,
       message: incident.message,
-      metadata: incident.metadata || {}
+      metadata: incident.metadata || {},
+      environment: getEnvironment()
     }])
     .select()
     .single();
@@ -276,16 +392,20 @@ async function getActiveIncidents(websiteId = null) {
   return data || [];
 }
 
-async function getRecentIncidents(websiteId = null, limit = 10) {
+async function getRecentIncidents(websiteId = null, limit = 10, { env } = {}) {
   const supabase = getSupabaseClient();
   let query = supabase
     .from('incidents')
     .select('*');
-  
+
   if (websiteId) {
     query = query.eq('website_id', websiteId);
   }
-  
+
+  if (env) {
+    query = query.eq('environment', env);
+  }
+
   const { data, error } = await query
     .order('started_at', { ascending: false })
     .limit(limit);
@@ -293,6 +413,7 @@ async function getRecentIncidents(websiteId = null, limit = 10) {
   if (error) throw error;
   
   return (data || []).map(incident => ({
+    id: incident.id,
     timestamp: new Date(incident.started_at).getTime(),
     websiteId: incident.website_id,
     type: incident.incident_type,
@@ -428,6 +549,29 @@ async function uploadBaseline(websiteId, buffer, filename = 'baseline.png') {
   };
 }
 
+async function listScreenshots(websiteId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.storage
+    .from('screenshots')
+    .list(websiteId, { sortBy: { column: 'created_at', order: 'desc' }, limit: 50 });
+
+  if (error) throw error;
+
+  return (data || [])
+    .filter(f => f.name.endsWith('.png'))
+    .map(f => {
+      const { data: urlData } = supabase.storage
+        .from('screenshots')
+        .getPublicUrl(`${websiteId}/${f.name}`);
+      return {
+        name: f.name,
+        url: urlData.publicUrl,
+        createdAt: f.created_at,
+        size: f.metadata?.size || 0
+      };
+    });
+}
+
 async function getBaselineUrl(websiteId) {
   const baseline = await getVisualBaseline(websiteId);
   if (!baseline) return null;
@@ -449,6 +593,12 @@ module.exports = {
   getWebsite,
   createWebsite,
   updateWebsite,
+  deleteMonitorCheck,
+  deleteIncident,
+  deleteAllIncidents,
+  deleteWebsite,
+  deleteEnvironmentData,
+  getEnvironment,
   
   // Clients
   getAllClients,
@@ -479,5 +629,6 @@ module.exports = {
   // Storage
   uploadScreenshot,
   uploadBaseline,
+  listScreenshots,
   getBaselineUrl
 };

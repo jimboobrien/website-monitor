@@ -20,6 +20,8 @@ const {
   getUptimeHistory
 } = require('./lib/dashboard-service-supabase');
 
+const { getMonitorChecks, listScreenshots, getBaselineUrl } = require('./lib/supabase');
+
 // No longer need config.json - all config comes from Supabase
 
 // CORS headers for browser requests
@@ -52,11 +54,12 @@ exports.handler = async (event, context) => {
   try {
     const params = event.queryStringParameters || {};
     const action = params.action || 'overview';
+    const envFilter = params.env || undefined; // optional: ?env=production or ?env=local
 
     switch (action) {
       case 'overview': {
         // Get all monitor stats and global statistics
-        const monitorStats = await getAllMonitorStats();
+        const monitorStats = await getAllMonitorStats({ env: envFilter });
         const globalStats = getGlobalStats(monitorStats);
         
         return {
@@ -74,7 +77,7 @@ exports.handler = async (event, context) => {
 
       case 'monitors': {
         // Get all monitors with their statistics
-        const monitorStats = await getAllMonitorStats();
+        const monitorStats = await getAllMonitorStats({ env: envFilter });
         
         // Optional: filter by client
         const clientId = params.client;
@@ -104,7 +107,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        const stats = await getMonitorStats(monitorId);
+        const stats = await getMonitorStats(monitorId, { env: envFilter });
         
         return {
           statusCode: 200,
@@ -119,7 +122,7 @@ exports.handler = async (event, context) => {
 
       case 'clients': {
         // Get monitors grouped by client
-        const monitorStats = await getAllMonitorStats();
+        const monitorStats = await getAllMonitorStats({ env: envFilter });
         const byClient = await getMonitorsByClient(monitorStats);
         
         return {
@@ -146,7 +149,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        const history = await getResponseTimeHistory(monitorId, hours);
+        const history = await getResponseTimeHistory(monitorId, hours, { env: envFilter });
         
         return {
           statusCode: 200,
@@ -172,7 +175,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        const history = await getUptimeHistory(monitorId, days);
+        const history = await getUptimeHistory(monitorId, days, { env: envFilter });
         
         return {
           statusCode: 200,
@@ -185,11 +188,63 @@ exports.handler = async (event, context) => {
         };
       }
 
+      case 'screenshots': {
+        const monitorId = params.id;
+
+        if (!monitorId) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Monitor id required' })
+          };
+        }
+
+        const [screenshots, baselineUrl] = await Promise.all([
+          listScreenshots(monitorId).catch(() => []),
+          getBaselineUrl(monitorId).catch(() => null)
+        ]);
+
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            data: { screenshots, baselineUrl },
+            timestamp: Date.now()
+          })
+        };
+      }
+
+      case 'checks': {
+        const monitorId = params.id;
+        const hours = parseInt(params.hours || '24', 10);
+
+        if (!monitorId) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Monitor id required' })
+          };
+        }
+
+        const checks = await getMonitorChecks(monitorId, hours, 1000, { env: envFilter });
+
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            data: checks,
+            timestamp: Date.now()
+          })
+        };
+      }
+
       default:
         return {
           statusCode: 400,
           headers,
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             error: 'Invalid action',
             validActions: [
               'overview',
@@ -197,7 +252,9 @@ exports.handler = async (event, context) => {
               'monitor',
               'clients',
               'response-time',
-              'uptime-history'
+              'uptime-history',
+              'checks',
+              'screenshots'
             ]
           })
         };

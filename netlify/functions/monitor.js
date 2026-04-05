@@ -21,8 +21,10 @@ if (process.env.SENDGRID_API_KEY) {
  */
 async function checkWebsite(site) {
   const startTime = Date.now();
-  const url = site.url;
+  let url = site.url;
   const name = site.name || url;
+  const isHttps = url.startsWith('https://');
+  const httpFallbackUrl = url.replace(/^https:\/\//, 'http://');
 
   console.log(`[CHECK] ${name} — ${url}`);
 
@@ -30,6 +32,7 @@ async function checkWebsite(site) {
     const response = await fetch(url, {
       method: 'GET',
       timeout: 10000,
+      redirect: 'follow',
       headers: {
         'User-Agent': 'WebsiteStatusMonitor/1.0'
       }
@@ -37,22 +40,78 @@ async function checkWebsite(site) {
 
     const responseTime = Date.now() - startTime;
     const isUp = response.ok;
+    const finalUrl = response.url || url;
+    const sslActive = finalUrl.startsWith('https://');
 
     if (isUp) {
-      console.log(`[  OK ] ${name} — ${response.status} in ${responseTime}ms`);
+      console.log(`[  OK ] ${name} — ${response.status} in ${responseTime}ms [${sslActive ? 'HTTPS' : 'HTTP'}]`);
     } else {
       console.warn(`[WARN ] ${name} — HTTP ${response.status} ${response.statusText} in ${responseTime}ms`);
     }
 
     return {
-      url,
+      url: finalUrl,
       status: response.status,
       statusText: response.statusText,
       isUp,
       responseTime,
+      ssl: sslActive,
       timestamp: new Date().toISOString()
     };
   } catch (error) {
+    // If HTTPS failed, try HTTP as fallback
+    if (isHttps) {
+      console.warn(`[RETRY] ${name} — HTTPS failed (${error.message}), trying HTTP...`);
+      try {
+        const retryStart = Date.now();
+        const response = await fetch(httpFallbackUrl, {
+          method: 'GET',
+          timeout: 10000,
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'WebsiteStatusMonitor/1.0'
+          }
+        });
+
+        const responseTime = Date.now() - retryStart;
+        const isUp = response.ok;
+        const finalUrl = response.url || httpFallbackUrl;
+
+        if (isUp) {
+          console.log(`[  OK ] ${name} — ${response.status} in ${responseTime}ms [HTTP fallback, no SSL]`);
+        } else {
+          console.warn(`[WARN ] ${name} — HTTP fallback ${response.status} ${response.statusText} in ${responseTime}ms`);
+        }
+
+        return {
+          url: finalUrl,
+          status: response.status,
+          statusText: response.statusText,
+          isUp,
+          responseTime,
+          ssl: false,
+          sslError: error.message,
+          timestamp: new Date().toISOString()
+        };
+      } catch (fallbackError) {
+        // Both HTTPS and HTTP failed
+        const responseTime = Date.now() - startTime;
+        console.error(`[FAIL ] ${name} — both HTTPS and HTTP failed (${fallbackError.message})`);
+
+        return {
+          url,
+          status: 0,
+          statusText: fallbackError.message,
+          isUp: false,
+          responseTime,
+          ssl: false,
+          sslError: error.message,
+          timestamp: new Date().toISOString(),
+          error: `HTTPS: ${error.message}; HTTP: ${fallbackError.message}`
+        };
+      }
+    }
+
     const responseTime = Date.now() - startTime;
     console.error(`[FAIL ] ${name} — ${error.message} (${responseTime}ms)`);
 
@@ -62,6 +121,7 @@ async function checkWebsite(site) {
       statusText: error.message,
       isUp: false,
       responseTime,
+      ssl: false,
       timestamp: new Date().toISOString(),
       error: error.message
     };
@@ -278,7 +338,11 @@ const monitorHandler = async (event, context) => {
             responseTime: result.responseTime,
             statusCode: result.status,
             error: result.error || null,
-            issues: []
+            issues: [],
+            metadata: {
+              ssl: result.ssl,
+              sslError: result.sslError || null
+            }
           });
         } catch (err) {
           console.error(`[DB   ] Failed to save check for ${site.name}: ${err.message}`);

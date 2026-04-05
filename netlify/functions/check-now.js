@@ -9,35 +9,80 @@ const {
 } = require('./lib/supabase');
 
 /**
- * Check a single website
+ * Check a single website with HTTPS fallback to HTTP
  */
 async function checkWebsite(url) {
   const startTime = Date.now();
+  const isHttps = url.startsWith('https://');
+  const httpFallbackUrl = url.replace(/^https:\/\//, 'http://');
 
   try {
     const response = await fetch(url, {
       method: 'GET',
       timeout: 10000,
+      redirect: 'follow',
       headers: {
         'User-Agent': 'WebsiteStatusMonitor/1.0'
       }
     });
 
     const responseTime = Date.now() - startTime;
+    const finalUrl = response.url || url;
 
     return {
       status: response.status,
       statusText: response.statusText,
       isUp: response.ok,
       responseTime,
+      ssl: finalUrl.startsWith('https://'),
       timestamp: new Date().toISOString()
     };
   } catch (error) {
+    // If HTTPS failed, try HTTP as fallback
+    if (isHttps) {
+      try {
+        const retryStart = Date.now();
+        const response = await fetch(httpFallbackUrl, {
+          method: 'GET',
+          timeout: 10000,
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'WebsiteStatusMonitor/1.0'
+          }
+        });
+
+        const responseTime = Date.now() - retryStart;
+        const finalUrl = response.url || httpFallbackUrl;
+
+        return {
+          status: response.status,
+          statusText: response.statusText,
+          isUp: response.ok,
+          responseTime,
+          ssl: false,
+          sslError: error.message,
+          timestamp: new Date().toISOString()
+        };
+      } catch (fallbackError) {
+        return {
+          status: 0,
+          statusText: fallbackError.message,
+          isUp: false,
+          responseTime: Date.now() - startTime,
+          ssl: false,
+          sslError: error.message,
+          timestamp: new Date().toISOString(),
+          error: `HTTPS: ${error.message}; HTTP: ${fallbackError.message}`
+        };
+      }
+    }
+
     return {
       status: 0,
       statusText: error.message,
       isUp: false,
       responseTime: Date.now() - startTime,
+      ssl: false,
       timestamp: new Date().toISOString(),
       error: error.message
     };
@@ -58,7 +103,11 @@ async function runCheck(site, activeIncidentsByWebsite) {
     responseTime: result.responseTime,
     statusCode: result.status,
     error: result.error || null,
-    issues: []
+    issues: [],
+    metadata: {
+      ssl: result.ssl,
+      sslError: result.sslError || null
+    }
   });
 
   // Handle incidents

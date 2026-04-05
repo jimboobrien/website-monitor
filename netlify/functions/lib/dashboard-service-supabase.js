@@ -48,13 +48,13 @@ function calculateAvgResponseTime(checks) {
 /**
  * Get monitor statistics
  */
-async function getMonitorStats(websiteId) {
+async function getMonitorStats(websiteId, { env } = {}) {
   try {
     // Get website config
     const website = await getWebsite(websiteId);
-    
+
     // Get all checks for the last 30 days (for statistics)
-    const allChecks = await getMonitorChecks(websiteId, 24 * 30, 10000);
+    const allChecks = await getMonitorChecks(websiteId, 24 * 30, 10000, { env });
     
     // Get checks for different time periods
     const checks24h = getChecksForPeriod(allChecks, 24);
@@ -68,15 +68,15 @@ async function getMonitorStats(websiteId) {
     const uptimeAll = calculateUptime(allChecks);
     
     // Get current status (last check)
-    const lastCheck = await getLatestCheck(websiteId);
+    const lastCheck = await getLatestCheck(websiteId, { env });
     const currentStatus = lastCheck?.status || 'unknown';
-    
+
     // Calculate average response time
     const avgResponseTime24h = calculateAvgResponseTime(checks24h);
     const avgResponseTime7d = calculateAvgResponseTime(checks7d);
-    
+
     // Get recent incidents
-    const recentIncidents = await getRecentIncidents(websiteId, 5);
+    const recentIncidents = await getRecentIncidents(websiteId, 5, { env });
     
     return {
       websiteId,
@@ -99,6 +99,8 @@ async function getMonitorStats(websiteId) {
       },
       totalChecks: allChecks.length,
       recentIncidents,
+      ssl: lastCheck?.metadata?.ssl ?? null,
+      sslError: lastCheck?.metadata?.sslError || null,
       features: {
         visualCheck: !!website.visual_check_enabled,
         customChecks: (website.custom_checks || []).length,
@@ -116,6 +118,8 @@ async function getMonitorStats(websiteId) {
       clientId: null,
       client: null,
       currentStatus: 'unknown',
+      ssl: null,
+      sslError: null,
       lastCheck: null,
       uptime: {
         '24h': 0,
@@ -142,13 +146,13 @@ async function getMonitorStats(websiteId) {
 /**
  * Get all monitors with their statistics
  */
-async function getAllMonitorStats() {
+async function getAllMonitorStats({ env } = {}) {
   try {
     const websites = await getAllWebsites();
-    
+
     const stats = await Promise.all(
       websites.map(async (website) => {
-        return await getMonitorStats(website.id);
+        return await getMonitorStats(website.id, { env });
       })
     );
     
@@ -227,9 +231,9 @@ async function getMonitorsByClient(monitorStats = null) {
 /**
  * Get response time history for charts
  */
-async function getResponseTimeHistory(websiteId, hours = 24) {
+async function getResponseTimeHistory(websiteId, hours = 24, { env } = {}) {
   try {
-    const checks = await getMonitorChecks(websiteId, hours, 1000);
+    const checks = await getMonitorChecks(websiteId, hours, 1000, { env });
     
     return checks
       .filter(c => c.responseTime)
@@ -248,9 +252,9 @@ async function getResponseTimeHistory(websiteId, hours = 24) {
 /**
  * Get uptime history for bar charts (daily buckets)
  */
-async function getUptimeHistory(websiteId, days = 7) {
+async function getUptimeHistory(websiteId, days = 7, { env } = {}) {
   try {
-    const checks = await getMonitorChecks(websiteId, days * 24, 10000);
+    const checks = await getMonitorChecks(websiteId, days * 24, 10000, { env });
     
     // Group by day
     const dayBuckets = {};

@@ -9,6 +9,7 @@ const MONITOR_URL = '/.netlify/functions/monitor';
 const MONITOR_ENHANCED_URL = '/.netlify/functions/monitor-enhanced';
 const SNAPSHOT_URL = '/.netlify/functions/snapshot';
 const CLIENTS_URL = '/.netlify/functions/clients';
+const MONITORS_URL = '/.netlify/functions/monitors';
 
 // Utility: Fetch dashboard data
 async function fetchDashboardData(action, params = {}) {
@@ -28,6 +29,45 @@ async function triggerCheck(websiteId = null) {
   if (!response.ok) {
     throw new Error(`Check failed: ${response.status}`);
   }
+  return await response.json();
+}
+
+// Environment helpers
+async function fetchEnvironment() {
+  const response = await fetch(MONITORS_URL);
+  if (!response.ok) return 'production';
+  const json = await response.json();
+  return json.environment;
+}
+
+async function clearEnvironmentData(env) {
+  const response = await fetch(`${MONITORS_URL}?action=delete-environment&env=${env}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`Clear failed: ${response.status}`);
+  return await response.json();
+}
+
+// Delete helpers
+async function deleteIncidentApi(incidentId) {
+  const response = await fetch(`${MONITORS_URL}?action=delete-incident&incidentId=${incidentId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
+  return await response.json();
+}
+
+async function deleteAllIncidentsApi(websiteId) {
+  const response = await fetch(`${MONITORS_URL}?action=delete-all-incidents&websiteId=${websiteId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
+  return await response.json();
+}
+
+async function deleteWebsiteApi(websiteId) {
+  const response = await fetch(`${MONITORS_URL}?action=delete-website&websiteId=${websiteId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
+  return await response.json();
+}
+
+async function deleteCheckApi(checkId) {
+  const response = await fetch(`${MONITORS_URL}?action=delete-check&checkId=${checkId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
   return await response.json();
 }
 
@@ -166,6 +206,32 @@ function ClientsView() {
   );
 }
 
+// SSL Badge Component
+function SslBadge({ ssl, sslError }) {
+  if (ssl === true) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800" title="HTTPS active">
+        HTTPS
+      </span>
+    );
+  }
+  if (ssl === false && sslError) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800" title={`SSL failed: ${sslError}`}>
+        HTTP only
+      </span>
+    );
+  }
+  if (ssl === false) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+        HTTP
+      </span>
+    );
+  }
+  return null;
+}
+
 // Status Badge Component
 function StatusBadge({ status }) {
   const colors = {
@@ -219,7 +285,7 @@ function StatCard({ title, value, subtitle, icon, color = 'blue' }) {
 }
 
 // Response Time Chart Component
-function ResponseTimeChart({ monitorId }) {
+function ResponseTimeChart({ monitorId, env }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(24);
@@ -228,7 +294,9 @@ function ResponseTimeChart({ monitorId }) {
     async function loadData() {
       try {
         setLoading(true);
-        const history = await fetchDashboardData('response-time', { id: monitorId, hours: timeRange });
+        const params = { id: monitorId, hours: timeRange };
+        if (env) params.env = env;
+        const history = await fetchDashboardData('response-time', params);
         
         // Format data for Recharts
         const formattedData = history.map(item => ({
@@ -311,7 +379,7 @@ function ResponseTimeChart({ monitorId }) {
 }
 
 // Uptime Chart Component
-function UptimeChart({ monitorId }) {
+function UptimeChart({ monitorId, env }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(7);
@@ -320,7 +388,9 @@ function UptimeChart({ monitorId }) {
     async function loadData() {
       try {
         setLoading(true);
-        const history = await fetchDashboardData('uptime-history', { id: monitorId, days: timeRange });
+        const params = { id: monitorId, days: timeRange };
+        if (env) params.env = env;
+        const history = await fetchDashboardData('uptime-history', params);
         
         // Format data for Recharts
         const formattedData = history.map(item => ({
@@ -405,8 +475,246 @@ function UptimeChart({ monitorId }) {
   );
 }
 
+// Check History List Component
+function CheckHistoryList({ monitorId, envFilter, onRefresh }) {
+  const [checks, setChecks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [hours, setHours] = useState(24);
+
+  const loadChecks = async () => {
+    try {
+      setLoading(true);
+      const params = { id: monitorId, hours };
+      if (envFilter && envFilter !== 'all') params.env = envFilter;
+      const data = await fetchDashboardData('checks', params);
+      setChecks(data);
+    } catch (err) {
+      console.error('Error loading checks:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadChecks();
+  }, [monitorId, hours, envFilter]);
+
+  const handleDeleteCheck = async (checkId) => {
+    setChecks(prev => prev.filter(c => c.id !== checkId));
+    try {
+      await deleteCheckApi(checkId);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Error deleting check:', err);
+      loadChecks();
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Check History ({checks.length})
+        </h3>
+        <select
+          value={hours}
+          onChange={(e) => setHours(Number(e.target.value))}
+          className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={6}>Last 6 hours</option>
+          <option value={12}>Last 12 hours</option>
+          <option value={24}>Last 24 hours</option>
+          <option value={48}>Last 48 hours</option>
+          <option value={168}>Last 7 days</option>
+        </select>
+      </div>
+
+      {checks.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-4">No checks in this time range</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
+                <th className="pb-2 pr-4">Time</th>
+                <th className="pb-2 pr-4">Status</th>
+                <th className="pb-2 pr-4">Response</th>
+                <th className="pb-2 pr-4">Code</th>
+                <th className="pb-2 pr-4">Error</th>
+                <th className="pb-2 w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {checks.map((check) => (
+                <tr key={check.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">
+                    {format(new Date(check.timestamp), 'MMM dd HH:mm:ss')}
+                  </td>
+                  <td className="py-2 pr-4">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      check.status === 'up' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {check.status}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4 text-gray-700">{check.responseTime}ms</td>
+                  <td className="py-2 pr-4 text-gray-500">{check.statusCode || '—'}</td>
+                  <td className="py-2 pr-4 text-red-500 text-xs max-w-xs truncate">{check.error || ''}</td>
+                  <td className="py-2">
+                    <button
+                      onClick={() => handleDeleteCheck(check.id)}
+                      className="text-gray-400 hover:text-red-500 transition"
+                      title="Delete check"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Screenshot Gallery Component
+function ScreenshotGallery({ monitorId, showToast }) {
+  const [data, setData] = useState({ screenshots: [], baselineUrl: null });
+  const [loading, setLoading] = useState(true);
+  const [capturing, setCapturing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  const loadScreenshots = () => {
+    return fetchDashboardData('screenshots', { id: monitorId })
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadScreenshots();
+  }, [monitorId]);
+
+  const handleCapture = async () => {
+    try {
+      setCapturing(true);
+      const response = await fetch(`${SNAPSHOT_URL}?action=capture&websiteId=${monitorId}`, { method: 'POST' });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || err.detail || `HTTP ${response.status}`);
+      }
+      const result = await response.json();
+      if (showToast) showToast(`Screenshot captured for ${result.name}`, 'success');
+      await loadScreenshots();
+    } catch (err) {
+      console.error('Snapshot capture error:', err);
+      if (showToast) showToast('Snapshot failed: ' + err.message, 'error');
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Lightbox */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-full">
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute -top-10 right-0 text-white text-2xl hover:opacity-70"
+            >
+              \u00d7
+            </button>
+            <img
+              src={selectedImage}
+              className="max-w-full max-h-[85vh] rounded shadow-2xl"
+              alt="Screenshot"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Capture button */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-gray-500">
+          {data.screenshots.length > 0
+            ? `${data.screenshots.length} screenshot(s)`
+            : 'No screenshots yet'}
+        </span>
+        <button
+          onClick={handleCapture}
+          disabled={capturing}
+          className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+        >
+          {capturing ? 'Capturing...' : 'Take Snapshot'}
+        </button>
+      </div>
+
+      {/* Baseline */}
+      {data.baselineUrl && (
+        <div className="mb-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Baseline</h4>
+          <img
+            src={data.baselineUrl}
+            className="w-48 h-auto rounded border border-gray-200 cursor-pointer hover:shadow-md transition"
+            onClick={() => setSelectedImage(data.baselineUrl)}
+            alt="Baseline screenshot"
+          />
+        </div>
+      )}
+
+      {/* Recent Screenshots */}
+      {data.screenshots.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Recent Screenshots</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {data.screenshots.map((shot) => (
+              <div key={shot.name} className="group relative">
+                <img
+                  src={shot.url}
+                  className="w-full h-auto rounded border border-gray-200 cursor-pointer hover:shadow-md transition"
+                  onClick={() => setSelectedImage(shot.url)}
+                  alt={shot.name}
+                  loading="lazy"
+                />
+                <div className="text-xs text-gray-500 mt-1 truncate">
+                  {shot.createdAt ? format(new Date(shot.createdAt), 'MMM dd HH:mm') : shot.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Monitor Detail Component
-function MonitorDetail({ monitor, onBack, onCheckNow, checking }) {
+function MonitorDetail({ monitor, onBack, onCheckNow, checking, onDeleteIncident, onDeleteAllIncidents, onDeleteWebsite, envFilter, onRefresh, showToast }) {
   const uptimeColor = monitor.uptime['24h'] >= 99 ? 'text-green-600' : 
                       monitor.uptime['24h'] >= 95 ? 'text-yellow-600' : 
                       'text-red-600';
@@ -456,6 +764,12 @@ function MonitorDetail({ monitor, onBack, onCheckNow, checking }) {
               <span className="text-blue-600">✓ {monitor.features.customChecks} Custom Checks</span>
             </>
           )}
+          {monitor.ssl !== null && (
+            <>
+              <span>•</span>
+              <SslBadge ssl={monitor.ssl} sslError={monitor.sslError} />
+            </>
+          )}
         </div>
       </div>
       
@@ -490,47 +804,87 @@ function MonitorDetail({ monitor, onBack, onCheckNow, checking }) {
         />
       </div>
       
-      {/* Charts */}
+      {/* Charts — key forces remount/refetch when monitor data changes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <ResponseTimeChart monitorId={monitor.websiteId} />
+          <ResponseTimeChart key={`rt-${monitor.websiteId}-${monitor.totalChecks}`} monitorId={monitor.websiteId} env={envFilter !== 'all' ? envFilter : undefined} />
         </div>
-        
+
         <div className="bg-white rounded-lg shadow p-6">
-          <UptimeChart monitorId={monitor.websiteId} />
+          <UptimeChart key={`ut-${monitor.websiteId}-${monitor.totalChecks}`} monitorId={monitor.websiteId} env={envFilter !== 'all' ? envFilter : undefined} />
         </div>
       </div>
       
+      {/* Screenshots */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Screenshots</h3>
+        <ScreenshotGallery key={`ss-${monitor.websiteId}-${monitor.totalChecks}`} monitorId={monitor.websiteId} showToast={showToast} />
+      </div>
+
+      {/* Check History */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <CheckHistoryList
+          key={`checks-${monitor.websiteId}-${monitor.totalChecks}`}
+          monitorId={monitor.websiteId}
+          envFilter={envFilter !== 'all' ? envFilter : undefined}
+          onRefresh={onRefresh}
+        />
+      </div>
+
       {/* Recent Incidents */}
       {monitor.recentIncidents.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Recent Incidents ({monitor.recentIncidents.length})
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Recent Incidents ({monitor.recentIncidents.length})
+            </h3>
+            <button
+              onClick={() => {
+                if (confirm(`Clear all ${monitor.recentIncidents.length} incident(s) for ${monitor.name}?`)) {
+                  onDeleteAllIncidents(monitor.websiteId);
+                }
+              }}
+              className="px-3 py-1.5 text-xs border border-red-400 text-red-600 rounded-lg hover:bg-red-50 transition"
+            >
+              Clear All
+            </button>
+          </div>
           <div className="space-y-3">
             {monitor.recentIncidents.map((incident, idx) => (
-              <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+              <div key={incident.id || idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                 <div className={`w-2 h-2 rounded-full mt-2 ${
                   incident.type === 'down' ? 'bg-red-500' : 'bg-yellow-500'
                 }`}></div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-900">
-                      {incident.type === 'down' ? '🔴 Monitor Down' : '⚠️ Issues Detected'}
+                      {incident.type === 'down' ? 'Monitor Down' : 'Issues Detected'}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      {format(new Date(incident.timestamp), 'MMM dd, yyyy HH:mm')}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">
+                        {format(new Date(incident.timestamp), 'MMM dd, yyyy HH:mm')}
+                      </span>
+                      {incident.id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteIncident(incident.id);
+                          }}
+                          className="text-gray-400 hover:text-red-500 transition"
+                          title="Delete incident"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm text-gray-600 mt-1">{incident.message}</p>
-                  {incident.issues && incident.issues.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {incident.issues.map((issue, i) => (
-                        <li key={i} className="text-xs text-gray-500 ml-4">
-                          • {issue.type}: {issue.message}
-                        </li>
-                      ))}
-                    </ul>
+                  {incident.resolvedAt && (
+                    <p className="text-xs text-green-600 mt-1">
+                      Resolved {formatDistanceToNow(new Date(incident.resolvedAt), { addSuffix: true })}
+                    </p>
                   )}
                 </div>
               </div>
@@ -551,7 +905,7 @@ function MonitorDetail({ monitor, onBack, onCheckNow, checking }) {
             {checking ? 'Checking...' : 'Check Now'}
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
           <div>
             <span className="text-gray-500">Website ID:</span>
             <code className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">{monitor.websiteId}</code>
@@ -576,6 +930,19 @@ function MonitorDetail({ monitor, onBack, onCheckNow, checking }) {
             <span className="text-gray-500">7d Avg Response:</span>
             <span className="ml-2 text-gray-900">{monitor.responseTime.avg7d}ms</span>
           </div>
+        </div>
+
+        <div className="pt-4 mt-4 border-t border-gray-200 flex justify-end">
+          <button
+            onClick={() => {
+              if (confirm(`Delete ${monitor.name}?\n\nThis permanently removes the monitor and ALL its data (checks, incidents, alerts, baselines).`)) {
+                onDeleteWebsite(monitor.websiteId, monitor.name);
+              }
+            }}
+            className="px-4 py-2 text-sm border border-red-500 text-red-600 rounded-lg hover:bg-red-50 transition"
+          >
+            Delete Monitor
+          </button>
         </div>
       </div>
     </div>
@@ -630,6 +997,7 @@ function MonitorCard({ monitor, onClick }) {
         <span>Last checked: {lastCheckText}</span>
         <div className="flex items-center gap-2">
           {monitor.client && <ClientBadge client={monitor.client} />}
+          <SslBadge ssl={monitor.ssl} sslError={monitor.sslError} />
           {monitor.features.visualCheck && (
             <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
               Visual
@@ -668,8 +1036,11 @@ function MonitorList({ monitors, onSelectMonitor }) {
   // Filter and sort monitors
   const filteredMonitors = monitors
     .filter(m => {
-      const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          m.url.toLowerCase().includes(searchTerm.toLowerCase());
+      const term = searchTerm.toLowerCase();
+      const clientName = (m.client?.name || m.clientId || '').toLowerCase();
+      const matchesSearch = m.name.toLowerCase().includes(term) ||
+                          m.url.toLowerCase().includes(term) ||
+                          clientName.includes(term);
       const matchesClient = filterClient === 'all' || m.clientId === filterClient;
       return matchesSearch && matchesClient;
     })
@@ -685,6 +1056,10 @@ function MonitorList({ monitors, onSelectMonitor }) {
           return a.uptime['24h'] - b.uptime['24h'];
         case 'response':
           return b.responseTime.avg24h - a.responseTime.avg24h;
+        case 'client':
+          const aClient = (a.client?.name || a.clientId || 'zzz').toLowerCase();
+          const bClient = (b.client?.name || b.clientId || 'zzz').toLowerCase();
+          return aClient.localeCompare(bClient);
         default:
           return 0;
       }
@@ -697,7 +1072,7 @@ function MonitorList({ monitors, onSelectMonitor }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
-            placeholder="Search monitors..."
+            placeholder="Search by name, URL, or client..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -723,6 +1098,7 @@ function MonitorList({ monitors, onSelectMonitor }) {
             <option value="name">Sort by Name</option>
             <option value="uptime">Sort by Uptime</option>
             <option value="response">Sort by Response Time</option>
+            <option value="client">Sort by Client</option>
           </select>
         </div>
       </div>
@@ -935,7 +1311,21 @@ function EndpointsView() {
 
 // Main App Component
 function App() {
-  const [view, setView] = useState('overview'); // 'overview', 'monitors', 'detail', or 'endpoints'
+  // Hash-based routing
+  const parseHash = () => {
+    const hash = window.location.hash || '#/';
+    if (hash.startsWith('#/monitor/')) {
+      return { view: 'detail', monitorId: hash.replace('#/monitor/', '') };
+    }
+    const routes = { '#/': 'overview', '#/monitors': 'monitors', '#/clients': 'clients', '#/endpoints': 'endpoints' };
+    return { view: routes[hash] || 'overview', monitorId: null };
+  };
+
+  const navigate = (path) => {
+    window.location.hash = path;
+  };
+
+  const [{ view, monitorId: routeMonitorId }, setRoute] = useState(parseHash);
   const [selectedMonitor, setSelectedMonitor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
@@ -943,18 +1333,49 @@ function App() {
   const [globalStats, setGlobalStats] = useState(null);
   const [monitors, setMonitors] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [currentEnv, setCurrentEnv] = useState(null);
+  const [envFilter, setEnvFilter] = useState('all');
+
+  // Listen for hash changes (back/forward buttons)
+  useEffect(() => {
+    const onHashChange = () => setRoute(parseHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // When route changes to a detail page, load the monitor
+  useEffect(() => {
+    if (view === 'detail' && routeMonitorId && (!selectedMonitor || selectedMonitor.websiteId !== routeMonitorId)) {
+      const envParam = envFilter !== 'all' ? { env: envFilter } : {};
+      fetchDashboardData('monitor', { id: routeMonitorId, ...envParam })
+        .then(setSelectedMonitor)
+        .catch(err => {
+          console.error('Error loading monitor:', err);
+          navigate('#/monitors');
+        });
+    }
+  }, [view, routeMonitorId, envFilter]);
+
+  // Show a toast notification that auto-dismisses
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
   
   // Load data
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
+      const envParam = envFilter !== 'all' ? { env: envFilter } : {};
+
       const [overview, monitorList] = await Promise.all([
-        fetchDashboardData('overview'),
-        fetchDashboardData('monitors')
+        fetchDashboardData('overview', envParam),
+        fetchDashboardData('monitors', envParam)
       ]);
-      
+
       setGlobalStats(overview.global);
       setMonitors(monitorList);
       setLastUpdate(new Date());
@@ -964,11 +1385,12 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
-  
-  // Initial load
+  }, [envFilter]);
+
+  // Initial load + detect current environment
   useEffect(() => {
     loadData();
+    fetchEnvironment().then(setCurrentEnv);
   }, [loadData]);
   
   // Auto-refresh every 30 seconds (but not on detail view to avoid disrupting chart interactions)
@@ -983,15 +1405,22 @@ function App() {
   const handleCheckAll = async () => {
     try {
       setChecking(true);
-      await triggerCheck();
-      // Wait a moment for data to propagate, then refresh
-      setTimeout(() => {
-        loadData();
-        setChecking(false);
-      }, 1500);
+      const result = await triggerCheck();
+      const up = result.results?.filter(r => r.isUp).length || 0;
+      const down = result.results?.filter(r => !r.isUp).length || 0;
+
+      // Refresh all UI data
+      await loadData();
+      setChecking(false);
+
+      if (down > 0) {
+        showToast(`Checked ${result.checked} sites — ${up} up, ${down} down`, 'warning');
+      } else {
+        showToast(`Checked ${result.checked} sites — all up`, 'success');
+      }
     } catch (err) {
       console.error('Error checking all monitors:', err);
-      alert('Failed to check monitors: ' + err.message);
+      showToast('Failed to check monitors: ' + err.message, 'error');
       setChecking(false);
     }
   };
@@ -1000,36 +1429,110 @@ function App() {
   const handleCheckOne = async (websiteId) => {
     try {
       setChecking(true);
-      await triggerCheck(websiteId);
-      setTimeout(() => {
-        loadData();
-        setChecking(false);
-      }, 1500);
+      const result = await triggerCheck(websiteId);
+      const check = result.results?.[0];
+
+      // Refresh detail view and global data
+      if (selectedMonitor) {
+        await refreshDetail(websiteId);
+      } else {
+        await loadData();
+      }
+      setChecking(false);
+
+      if (check?.isUp) {
+        showToast(`${check.name} is up — ${check.responseTime}ms`, 'success');
+      } else {
+        showToast(`${check?.name || 'Site'} is down: ${check?.error || `HTTP ${check?.status}`}`, 'error');
+      }
     } catch (err) {
       console.error('Error checking monitor:', err);
-      alert('Failed to check monitor: ' + err.message);
+      showToast('Failed to check monitor: ' + err.message, 'error');
       setChecking(false);
     }
   };
 
-  // Handle monitor selection
-  const handleSelectMonitor = async (monitor) => {
-    // Fetch fresh data for the selected monitor
+  // Refresh the current detail view fully (stats, charts, incidents)
+  const refreshDetail = async (websiteId) => {
     try {
-      const freshData = await fetchDashboardData('monitor', { id: monitor.websiteId });
-      setSelectedMonitor(freshData);
-      setView('detail');
+      const envParam = envFilter !== 'all' ? { env: envFilter } : {};
+      const [freshMonitor, overview, monitorList] = await Promise.all([
+        fetchDashboardData('monitor', { id: websiteId, ...envParam }),
+        fetchDashboardData('overview', envParam),
+        fetchDashboardData('monitors', envParam)
+      ]);
+      setSelectedMonitor(freshMonitor);
+      setGlobalStats(overview.global);
+      setMonitors(monitorList);
+      setLastUpdate(new Date());
     } catch (err) {
-      console.error('Error loading monitor detail:', err);
-      alert('Failed to load monitor details: ' + err.message);
+      console.error('Error refreshing data:', err);
     }
   };
-  
+
+  // Delete a single incident
+  const handleDeleteIncident = async (incidentId) => {
+    setSelectedMonitor(prev => ({
+      ...prev,
+      recentIncidents: prev.recentIncidents.filter(i => i.id !== incidentId)
+    }));
+
+    try {
+      await deleteIncidentApi(incidentId);
+      await refreshDetail(selectedMonitor.websiteId);
+      showToast('Incident deleted', 'success');
+    } catch (err) {
+      console.error('Error deleting incident:', err);
+      showToast('Failed to delete incident: ' + err.message, 'error');
+      await refreshDetail(selectedMonitor.websiteId);
+    }
+  };
+
+  // Delete all incidents for a monitor
+  const handleDeleteAllIncidents = async (websiteId) => {
+    setSelectedMonitor(prev => ({
+      ...prev,
+      recentIncidents: []
+    }));
+
+    try {
+      await deleteAllIncidentsApi(websiteId);
+      await refreshDetail(websiteId);
+      showToast('All incidents cleared', 'success');
+    } catch (err) {
+      console.error('Error deleting incidents:', err);
+      showToast('Failed to delete incidents: ' + err.message, 'error');
+      await refreshDetail(websiteId);
+    }
+  };
+
+  // Delete a website and all its data
+  const handleDeleteWebsite = async (websiteId, name) => {
+    setMonitors(prev => prev.filter(m => m.websiteId !== websiteId));
+    setSelectedMonitor(null);
+    navigate('#/monitors');
+
+    try {
+      await deleteWebsiteApi(websiteId);
+      await loadData();
+      showToast(`${name} deleted`, 'success');
+    } catch (err) {
+      console.error('Error deleting website:', err);
+      showToast('Failed to delete website: ' + err.message, 'error');
+      await loadData();
+    }
+  };
+
+  // Handle monitor selection
+  const handleSelectMonitor = (monitor) => {
+    navigate(`#/monitor/${monitor.websiteId}`);
+  };
+
   // Handle back from detail
   const handleBackFromDetail = () => {
     setSelectedMonitor(null);
-    setView('monitors');
-    loadData(); // Refresh data when going back
+    navigate('#/monitors');
+    loadData();
   };
   
   if (loading && !globalStats) {
@@ -1063,6 +1566,26 @@ function App() {
   
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in">
+          <div className={`px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 ${
+            toast.type === 'success' ? 'bg-green-600 text-white' :
+            toast.type === 'warning' ? 'bg-yellow-500 text-white' :
+            toast.type === 'error' ? 'bg-red-600 text-white' :
+            'bg-gray-800 text-white'
+          }`}>
+            <span>{
+              toast.type === 'success' ? '\u2713' :
+              toast.type === 'warning' ? '!' :
+              toast.type === 'error' ? '\u2717' : ''
+            }</span>
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} className="ml-2 opacity-70 hover:opacity-100">\u00d7</button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -1079,6 +1602,43 @@ function App() {
             </div>
             
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <select
+                  value={envFilter}
+                  onChange={(e) => setEnvFilter(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Data</option>
+                  <option value="production">Production</option>
+                  <option value="local">Local</option>
+                </select>
+                {envFilter === 'local' && (
+                  <button
+                    onClick={async () => {
+                      if (confirm('Clear ALL local check data and incidents? This cannot be undone.')) {
+                        try {
+                          const result = await clearEnvironmentData('local');
+                          await loadData();
+                          showToast(`Cleared ${result.deleted.checksDeleted} checks, ${result.deleted.incidentsDeleted} incidents`, 'success');
+                        } catch (err) {
+                          showToast('Failed to clear local data: ' + err.message, 'error');
+                        }
+                      }
+                    }}
+                    className="px-3 py-2 text-sm border border-red-400 text-red-600 rounded-lg hover:bg-red-50 transition"
+                    title="Delete all local environment data"
+                  >
+                    Clear Local
+                  </button>
+                )}
+              </div>
+              {currentEnv && (
+                <span className={`px-2 py-1 text-xs rounded font-medium ${
+                  currentEnv === 'production' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {currentEnv}
+                </span>
+              )}
               <button
                 onClick={handleCheckAll}
                 className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
@@ -1100,7 +1660,7 @@ function App() {
           {view !== 'detail' && (
             <nav className="mt-4 flex gap-4 border-b border-gray-200">
               <button
-                onClick={() => setView('overview')}
+                onClick={() => navigate('#/')}
                 className={`pb-2 px-1 font-medium text-sm ${
                   view === 'overview'
                     ? 'border-b-2 border-blue-500 text-blue-600'
@@ -1110,7 +1670,7 @@ function App() {
                 Overview
               </button>
               <button
-                onClick={() => setView('monitors')}
+                onClick={() => navigate('#/monitors')}
                 className={`pb-2 px-1 font-medium text-sm ${
                   view === 'monitors'
                     ? 'border-b-2 border-blue-500 text-blue-600'
@@ -1120,7 +1680,7 @@ function App() {
                 Monitors ({monitors.length})
               </button>
               <button
-                onClick={() => setView('clients')}
+                onClick={() => navigate('#/clients')}
                 className={`pb-2 px-1 font-medium text-sm ${
                   view === 'clients'
                     ? 'border-b-2 border-blue-500 text-blue-600'
@@ -1130,7 +1690,7 @@ function App() {
                 Clients
               </button>
               <button
-                onClick={() => setView('endpoints')}
+                onClick={() => navigate('#/endpoints')}
                 className={`pb-2 px-1 font-medium text-sm ${
                   view === 'endpoints'
                     ? 'border-b-2 border-blue-500 text-blue-600'
@@ -1166,6 +1726,12 @@ function App() {
             onBack={handleBackFromDetail}
             onCheckNow={handleCheckOne}
             checking={checking}
+            onDeleteIncident={handleDeleteIncident}
+            onDeleteAllIncidents={handleDeleteAllIncidents}
+            onDeleteWebsite={handleDeleteWebsite}
+            envFilter={envFilter}
+            onRefresh={() => refreshDetail(selectedMonitor.websiteId)}
+            showToast={showToast}
           />
         )}
 
