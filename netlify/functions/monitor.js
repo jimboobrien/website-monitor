@@ -1,3 +1,4 @@
+const { schedule } = require('@netlify/functions');
 const fetch = require('node-fetch');
 const sgMail = require('@sendgrid/mail');
 const {
@@ -280,4 +281,4 @@ const monitorHandler = async (event, context) => {
   }
 };
 
-exports.handler = monitorHandler;
+exports.handler = schedule("*/5 * * * *", monitorHandler);

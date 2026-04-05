@@ -104,7 +104,20 @@ async function createClientRecord(client) {
     .insert([client])
     .select()
     .single();
-  
+
+  if (error) throw error;
+  return data;
+}
+
+async function updateClient(clientId, updates) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('clients')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', clientId)
+    .select()
+    .single();
+
   if (error) throw error;
   return data;
 }
@@ -441,6 +454,7 @@ module.exports = {
   getAllClients,
   getClient,
   createClientRecord,
+  updateClient,
   
   // Monitor Checks
   saveMonitorCheck,

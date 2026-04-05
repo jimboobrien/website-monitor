@@ -38,6 +38,7 @@ CREATE TABLE clients (
   name TEXT NOT NULL,
   email TEXT,
   notes TEXT,
+  color TEXT DEFAULT '#6B7280',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

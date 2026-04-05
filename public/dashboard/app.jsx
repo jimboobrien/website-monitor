@@ -2,8 +2,13 @@ const { useState, useEffect, useCallback, useMemo } = React;
 const { formatDistanceToNow, format } = dateFns;
 const { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
 
-// API Base URL - adjust for your deployment
+// API Base URLs
 const API_BASE = '/.netlify/functions/dashboard-data';
+const CHECK_NOW_BASE = '/.netlify/functions/check-now';
+const MONITOR_URL = '/.netlify/functions/monitor';
+const MONITOR_ENHANCED_URL = '/.netlify/functions/monitor-enhanced';
+const SNAPSHOT_URL = '/.netlify/functions/snapshot';
+const CLIENTS_URL = '/.netlify/functions/clients';
 
 // Utility: Fetch dashboard data
 async function fetchDashboardData(action, params = {}) {
@@ -14,6 +19,151 @@ async function fetchDashboardData(action, params = {}) {
   }
   const json = await response.json();
   return json.data;
+}
+
+// Utility: Trigger a check
+async function triggerCheck(websiteId = null) {
+  const params = websiteId ? `?id=${websiteId}` : '?all=true';
+  const response = await fetch(`${CHECK_NOW_BASE}${params}`, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`Check failed: ${response.status}`);
+  }
+  return await response.json();
+}
+
+// Client API helpers
+async function fetchClients() {
+  const response = await fetch(CLIENTS_URL);
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const json = await response.json();
+  return json.data;
+}
+
+async function updateClientApi(clientId, updates) {
+  const response = await fetch(`${CLIENTS_URL}?id=${clientId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const json = await response.json();
+  return json.data;
+}
+
+// Color Picker Component
+function ColorPicker({ value, onChange }) {
+  const presets = [
+    '#EF4444', '#F97316', '#F59E0B', '#EAB308',
+    '#84CC16', '#22C55E', '#10B981', '#14B8A6',
+    '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
+    '#8B5CF6', '#A855F7', '#D946EF', '#EC4899',
+    '#F43F5E', '#6B7280', '#78716C', '#1E293B'
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      {presets.map(color => (
+        <button
+          key={color}
+          onClick={() => onChange(color)}
+          className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
+          style={{
+            backgroundColor: color,
+            borderColor: value === color ? '#1E293B' : 'transparent',
+            transform: value === color ? 'scale(1.15)' : undefined
+          }}
+          title={color}
+        />
+      ))}
+      <input
+        type="color"
+        value={value || '#6B7280'}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-7 h-7 rounded cursor-pointer border-0 p-0"
+        title="Custom color"
+      />
+    </div>
+  );
+}
+
+// Client Badge Component
+function ClientBadge({ client }) {
+  if (!client) return null;
+  const color = client.color || '#6B7280';
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+      style={{ backgroundColor: color }}
+    >
+      {client.name}
+    </span>
+  );
+}
+
+// Clients Management View
+function ClientsView() {
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => {
+    fetchClients().then(setClients).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  const handleColorChange = async (clientId, color) => {
+    setSaving(clientId);
+    try {
+      const updated = await updateClientApi(clientId, { color });
+      setClients(prev => prev.map(c => c.id === clientId ? { ...c, color: updated.color } : c));
+    } catch (err) {
+      console.error('Failed to update client color:', err);
+      alert('Failed to save color: ' + err.message);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6">Client Colors</h2>
+        <div className="space-y-6">
+          {clients.map(client => (
+            <div key={client.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+              <div className="flex items-center gap-3 mb-3">
+                <span
+                  className="w-4 h-4 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: client.color || '#6B7280' }}
+                ></span>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-gray-900">{client.name}</h3>
+                  <p className="text-xs text-gray-500">{client.id}{client.email ? ` \u2022 ${client.email}` : ''}</p>
+                </div>
+                {saving === client.id && (
+                  <span className="text-xs text-blue-600">Saving...</span>
+                )}
+              </div>
+              <ColorPicker
+                value={client.color || '#6B7280'}
+                onChange={(color) => handleColorChange(client.id, color)}
+              />
+            </div>
+          ))}
+          {clients.length === 0 && (
+            <p className="text-sm text-gray-500">No clients found.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Status Badge Component
@@ -256,7 +406,7 @@ function UptimeChart({ monitorId }) {
 }
 
 // Monitor Detail Component
-function MonitorDetail({ monitor, onBack }) {
+function MonitorDetail({ monitor, onBack, onCheckNow, checking }) {
   const uptimeColor = monitor.uptime['24h'] >= 99 ? 'text-green-600' : 
                       monitor.uptime['24h'] >= 95 ? 'text-yellow-600' : 
                       'text-red-600';
@@ -293,7 +443,7 @@ function MonitorDetail({ monitor, onBack }) {
         <div className="flex items-center gap-4 text-sm text-gray-600">
           <span>Last checked: {lastCheckText}</span>
           <span>•</span>
-          <span>Client: {monitor.clientId || 'Uncategorized'}</span>
+          {monitor.client ? <ClientBadge client={monitor.client} /> : <span>Uncategorized</span>}
           {monitor.features.visualCheck && (
             <>
               <span>•</span>
@@ -389,13 +539,26 @@ function MonitorDetail({ monitor, onBack }) {
         </div>
       )}
       
-      {/* Monitor Info */}
+      {/* Monitor Info & Actions */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitor Info</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Monitor Info</h3>
+          <button
+            onClick={() => onCheckNow(monitor.websiteId)}
+            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            disabled={checking}
+          >
+            {checking ? 'Checking...' : 'Check Now'}
+          </button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
+            <span className="text-gray-500">Website ID:</span>
+            <code className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">{monitor.websiteId}</code>
+          </div>
+          <div className="flex items-center">
             <span className="text-gray-500">Client:</span>
-            <span className="ml-2 text-gray-900">{monitor.clientId || 'Uncategorized'}</span>
+            <span className="ml-2">{monitor.client ? <ClientBadge client={monitor.client} /> : <span className="text-gray-900">Uncategorized</span>}</span>
           </div>
           <div>
             <span className="text-gray-500">Total Checks:</span>
@@ -408,6 +571,10 @@ function MonitorDetail({ monitor, onBack }) {
           <div>
             <span className="text-gray-500">Current Response:</span>
             <span className="ml-2 text-gray-900">{monitor.responseTime.current}ms</span>
+          </div>
+          <div>
+            <span className="text-gray-500">7d Avg Response:</span>
+            <span className="ml-2 text-gray-900">{monitor.responseTime.avg7d}ms</span>
           </div>
         </div>
       </div>
@@ -425,11 +592,15 @@ function MonitorCard({ monitor, onClick }) {
     ? formatDistanceToNow(new Date(monitor.lastCheck), { addSuffix: true })
     : 'Never';
   
+  const clientColor = monitor.client?.color || '#6B7280';
+
   return (
-    <div 
-      className="monitor-card bg-white rounded-lg shadow p-6 cursor-pointer"
+    <div
+      className="monitor-card bg-white rounded-lg shadow cursor-pointer overflow-hidden"
       onClick={onClick}
     >
+      <div className="h-1.5" style={{ backgroundColor: clientColor }}></div>
+      <div className="p-6">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold text-gray-900 truncate">
@@ -457,13 +628,16 @@ function MonitorCard({ monitor, onClick }) {
       
       <div className="flex items-center justify-between text-xs text-gray-500">
         <span>Last checked: {lastCheckText}</span>
-        {monitor.features.visualCheck && (
-          <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-            📸 Visual
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {monitor.client && <ClientBadge client={monitor.client} />}
+          {monitor.features.visualCheck && (
+            <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+              Visual
+            </span>
+          )}
+        </div>
       </div>
-      
+
       {monitor.recentIncidents.length > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-200">
           <p className="text-xs text-red-600 font-medium">
@@ -471,6 +645,7 @@ function MonitorCard({ monitor, onClick }) {
           </p>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -481,8 +656,14 @@ function MonitorList({ monitors, onSelectMonitor }) {
   const [filterClient, setFilterClient] = useState('all');
   const [sortBy, setSortBy] = useState('status');
   
-  // Get unique clients
-  const clients = [...new Set(monitors.map(m => m.clientId))].filter(Boolean);
+  // Get unique clients with their data
+  const clientMap = {};
+  monitors.forEach(m => {
+    if (m.clientId && m.client && !clientMap[m.clientId]) {
+      clientMap[m.clientId] = m.client;
+    }
+  });
+  const clients = Object.keys(clientMap);
   
   // Filter and sort monitors
   const filteredMonitors = monitors
@@ -528,8 +709,8 @@ function MonitorList({ monitors, onSelectMonitor }) {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Clients</option>
-            {clients.map(client => (
-              <option key={client} value={client}>{client}</option>
+            {clients.map(id => (
+              <option key={id} value={id}>{clientMap[id]?.name || id}</option>
             ))}
           </select>
           
@@ -641,11 +822,123 @@ function DashboardOverview({ globalStats, monitors }) {
   );
 }
 
+// Endpoint URL display helper
+function EndpointRow({ label, url, description }) {
+  const fullUrl = `${window.location.origin}${url}`;
+  return (
+    <div className="flex flex-col md:flex-row md:items-center gap-2 p-4 bg-gray-50 rounded-lg">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900">{label}</p>
+        <p className="text-xs text-gray-500">{description}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <code className="text-xs bg-white border border-gray-200 rounded px-3 py-1.5 text-gray-700 truncate max-w-md block">
+          {fullUrl}
+        </code>
+        <button
+          onClick={() => { navigator.clipboard.writeText(fullUrl); }}
+          className="px-2 py-1.5 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition flex-shrink-0"
+          title="Copy URL"
+        >
+          Copy
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// API Endpoints View
+function EndpointsView() {
+  return (
+    <div>
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">API Endpoints</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          Use these URLs to trigger checks, view data, or integrate with external services.
+        </p>
+
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Monitoring</h3>
+        <div className="space-y-3 mb-6">
+          <EndpointRow
+            label="Basic Monitor"
+            url={MONITOR_URL}
+            description="Run basic HTTP checks on all sites and send alerts"
+          />
+          <EndpointRow
+            label="Enhanced Monitor"
+            url={MONITOR_ENHANCED_URL}
+            description="Run checks with visual comparison and custom element checks (scheduled every 15 min)"
+          />
+          <EndpointRow
+            label="Check All Sites Now"
+            url={`${CHECK_NOW_BASE}?all=true`}
+            description="On-demand check of all sites — saves results to database"
+          />
+          <EndpointRow
+            label="Check Single Site"
+            url={`${CHECK_NOW_BASE}?id=WEBSITE_ID`}
+            description="On-demand check of a single site by its ID"
+          />
+        </div>
+
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Snapshots</h3>
+        <div className="space-y-3 mb-6">
+          <EndpointRow
+            label="Capture Snapshot"
+            url={`${SNAPSHOT_URL}?action=capture&websiteId=WEBSITE_ID`}
+            description="Capture a new snapshot (screenshot + HTML) of a website"
+          />
+          <EndpointRow
+            label="List Snapshots"
+            url={`${SNAPSHOT_URL}?action=list&websiteId=WEBSITE_ID`}
+            description="List all snapshots for a website"
+          />
+          <EndpointRow
+            label="Snapshot Viewer"
+            url="/.netlify/functions/snapshot-viewer"
+            description="HTML UI for browsing all captured snapshots"
+          />
+        </div>
+
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Dashboard Data</h3>
+        <div className="space-y-3">
+          <EndpointRow
+            label="Overview"
+            url={`${API_BASE}?action=overview`}
+            description="Global statistics and recent incidents"
+          />
+          <EndpointRow
+            label="All Monitors"
+            url={`${API_BASE}?action=monitors`}
+            description="All monitors with current stats"
+          />
+          <EndpointRow
+            label="Single Monitor"
+            url={`${API_BASE}?action=monitor&id=WEBSITE_ID`}
+            description="Detailed stats for a specific monitor"
+          />
+          <EndpointRow
+            label="Response Time History"
+            url={`${API_BASE}?action=response-time&id=WEBSITE_ID&hours=24`}
+            description="Response time data points for charts"
+          />
+          <EndpointRow
+            label="Uptime History"
+            url={`${API_BASE}?action=uptime-history&id=WEBSITE_ID&days=7`}
+            description="Daily uptime percentages for bar charts"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Main App Component
 function App() {
-  const [view, setView] = useState('overview'); // 'overview', 'monitors', or 'detail'
+  const [view, setView] = useState('overview'); // 'overview', 'monitors', 'detail', or 'endpoints'
   const [selectedMonitor, setSelectedMonitor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState(null);
   const [globalStats, setGlobalStats] = useState(null);
   const [monitors, setMonitors] = useState([]);
@@ -686,6 +979,39 @@ function App() {
     return () => clearInterval(interval);
   }, [loadData, view]);
   
+  // Check all monitors
+  const handleCheckAll = async () => {
+    try {
+      setChecking(true);
+      await triggerCheck();
+      // Wait a moment for data to propagate, then refresh
+      setTimeout(() => {
+        loadData();
+        setChecking(false);
+      }, 1500);
+    } catch (err) {
+      console.error('Error checking all monitors:', err);
+      alert('Failed to check monitors: ' + err.message);
+      setChecking(false);
+    }
+  };
+
+  // Check a single monitor
+  const handleCheckOne = async (websiteId) => {
+    try {
+      setChecking(true);
+      await triggerCheck(websiteId);
+      setTimeout(() => {
+        loadData();
+        setChecking(false);
+      }, 1500);
+    } catch (err) {
+      console.error('Error checking monitor:', err);
+      alert('Failed to check monitor: ' + err.message);
+      setChecking(false);
+    }
+  };
+
   // Handle monitor selection
   const handleSelectMonitor = async (monitor) => {
     // Fetch fresh data for the selected monitor
@@ -752,13 +1078,20 @@ function App() {
               )}
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCheckAll}
+                className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                disabled={checking}
+              >
+                {checking ? 'Checking...' : 'Check All Sites'}
+              </button>
               <button
                 onClick={loadData}
                 className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
                 disabled={loading}
               >
-                {loading ? 'Refreshing...' : '🔄 Refresh'}
+                {loading ? 'Refreshing...' : 'Refresh'}
               </button>
             </div>
           </div>
@@ -786,6 +1119,26 @@ function App() {
               >
                 Monitors ({monitors.length})
               </button>
+              <button
+                onClick={() => setView('clients')}
+                className={`pb-2 px-1 font-medium text-sm ${
+                  view === 'clients'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Clients
+              </button>
+              <button
+                onClick={() => setView('endpoints')}
+                className={`pb-2 px-1 font-medium text-sm ${
+                  view === 'endpoints'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                API Endpoints
+              </button>
             </nav>
           )}
         </div>
@@ -811,7 +1164,17 @@ function App() {
           <MonitorDetail
             monitor={selectedMonitor}
             onBack={handleBackFromDetail}
+            onCheckNow={handleCheckOne}
+            checking={checking}
           />
+        )}
+
+        {view === 'clients' && (
+          <ClientsView />
+        )}
+
+        {view === 'endpoints' && (
+          <EndpointsView />
         )}
       </main>
     </div>

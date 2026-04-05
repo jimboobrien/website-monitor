@@ -83,6 +83,7 @@ async function getMonitorStats(websiteId) {
       name: website.name,
       url: website.url,
       clientId: website.client_id,
+      client: website.clients || null,
       currentStatus,
       lastCheck: lastCheck?.timestamp || null,
       uptime: {
@@ -113,6 +114,7 @@ async function getMonitorStats(websiteId) {
       name: websiteId,
       url: '',
       clientId: null,
+      client: null,
       currentStatus: 'unknown',
       lastCheck: null,
       uptime: {
