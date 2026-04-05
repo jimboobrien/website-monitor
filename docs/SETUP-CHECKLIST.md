@@ -18,7 +18,7 @@
 node setup-supabase.js
 
 # Copy the SQL output and run it in Supabase SQL Editor:
-# https://fksomdzgdmgeksubvfxw.supabase.co/project/_/sql/new
+# https://XXXXXXXXXXXXXXXX.supabase.co/project/_/sql/new
 ```
 
 **Verify:** Check Table Editor - should see 6 tables (clients, websites, monitor_checks, incidents, visual_baselines, alert_history)
