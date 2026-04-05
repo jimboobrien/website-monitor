@@ -32,20 +32,6 @@ async function triggerCheck(websiteId = null) {
   return await response.json();
 }
 
-// Environment helpers
-async function fetchEnvironment() {
-  const response = await fetch(MONITORS_URL);
-  if (!response.ok) return 'production';
-  const json = await response.json();
-  return json.environment;
-}
-
-async function clearEnvironmentData(env) {
-  const response = await fetch(`${MONITORS_URL}?action=delete-environment&env=${env}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error(`Clear failed: ${response.status}`);
-  return await response.json();
-}
-
 // Delete helpers
 async function deleteIncidentApi(incidentId) {
   const response = await fetch(`${MONITORS_URL}?action=delete-incident&incidentId=${incidentId}`, { method: 'DELETE' });
@@ -285,7 +271,7 @@ function StatCard({ title, value, subtitle, icon, color = 'blue' }) {
 }
 
 // Response Time Chart Component
-function ResponseTimeChart({ monitorId, env }) {
+function ResponseTimeChart({ monitorId }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(24);
@@ -294,9 +280,7 @@ function ResponseTimeChart({ monitorId, env }) {
     async function loadData() {
       try {
         setLoading(true);
-        const params = { id: monitorId, hours: timeRange };
-        if (env) params.env = env;
-        const history = await fetchDashboardData('response-time', params);
+        const history = await fetchDashboardData('response-time', { id: monitorId, hours: timeRange });
         
         // Format data for Recharts
         const formattedData = history.map(item => ({
@@ -379,7 +363,7 @@ function ResponseTimeChart({ monitorId, env }) {
 }
 
 // Uptime Chart Component
-function UptimeChart({ monitorId, env }) {
+function UptimeChart({ monitorId }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(7);
@@ -388,9 +372,7 @@ function UptimeChart({ monitorId, env }) {
     async function loadData() {
       try {
         setLoading(true);
-        const params = { id: monitorId, days: timeRange };
-        if (env) params.env = env;
-        const history = await fetchDashboardData('uptime-history', params);
+        const history = await fetchDashboardData('uptime-history', { id: monitorId, days: timeRange });
         
         // Format data for Recharts
         const formattedData = history.map(item => ({
@@ -476,7 +458,7 @@ function UptimeChart({ monitorId, env }) {
 }
 
 // Check History List Component
-function CheckHistoryList({ monitorId, envFilter, onRefresh }) {
+function CheckHistoryList({ monitorId, onRefresh }) {
   const [checks, setChecks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hours, setHours] = useState(24);
@@ -484,9 +466,7 @@ function CheckHistoryList({ monitorId, envFilter, onRefresh }) {
   const loadChecks = async () => {
     try {
       setLoading(true);
-      const params = { id: monitorId, hours };
-      if (envFilter && envFilter !== 'all') params.env = envFilter;
-      const data = await fetchDashboardData('checks', params);
+      const data = await fetchDashboardData('checks', { id: monitorId, hours });
       setChecks(data);
     } catch (err) {
       console.error('Error loading checks:', err);
@@ -497,7 +477,7 @@ function CheckHistoryList({ monitorId, envFilter, onRefresh }) {
 
   useEffect(() => {
     loadChecks();
-  }, [monitorId, hours, envFilter]);
+  }, [monitorId, hours]);
 
   const handleDeleteCheck = async (checkId) => {
     setChecks(prev => prev.filter(c => c.id !== checkId));
@@ -714,7 +694,7 @@ function ScreenshotGallery({ monitorId, showToast }) {
 }
 
 // Monitor Detail Component
-function MonitorDetail({ monitor, onBack, onCheckNow, checking, onDeleteIncident, onDeleteAllIncidents, onDeleteWebsite, envFilter, onRefresh, showToast }) {
+function MonitorDetail({ monitor, onBack, onCheckNow, checking, onDeleteIncident, onDeleteAllIncidents, onDeleteWebsite, onRefresh, showToast }) {
   const uptimeColor = monitor.uptime['24h'] >= 99 ? 'text-green-600' : 
                       monitor.uptime['24h'] >= 95 ? 'text-yellow-600' : 
                       'text-red-600';
@@ -807,11 +787,11 @@ function MonitorDetail({ monitor, onBack, onCheckNow, checking, onDeleteIncident
       {/* Charts — key forces remount/refetch when monitor data changes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <ResponseTimeChart key={`rt-${monitor.websiteId}-${monitor.totalChecks}`} monitorId={monitor.websiteId} env={envFilter !== 'all' ? envFilter : undefined} />
+          <ResponseTimeChart key={`rt-${monitor.websiteId}-${monitor.totalChecks}`} monitorId={monitor.websiteId} />
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <UptimeChart key={`ut-${monitor.websiteId}-${monitor.totalChecks}`} monitorId={monitor.websiteId} env={envFilter !== 'all' ? envFilter : undefined} />
+          <UptimeChart key={`ut-${monitor.websiteId}-${monitor.totalChecks}`} monitorId={monitor.websiteId} />
         </div>
       </div>
       
@@ -826,7 +806,6 @@ function MonitorDetail({ monitor, onBack, onCheckNow, checking, onDeleteIncident
         <CheckHistoryList
           key={`checks-${monitor.websiteId}-${monitor.totalChecks}`}
           monitorId={monitor.websiteId}
-          envFilter={envFilter !== 'all' ? envFilter : undefined}
           onRefresh={onRefresh}
         />
       </div>
@@ -1334,8 +1313,6 @@ function App() {
   const [monitors, setMonitors] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [toast, setToast] = useState(null);
-  const [currentEnv, setCurrentEnv] = useState(null);
-  const [envFilter, setEnvFilter] = useState('all');
 
   // Listen for hash changes (back/forward buttons)
   useEffect(() => {
@@ -1347,15 +1324,14 @@ function App() {
   // When route changes to a detail page, load the monitor
   useEffect(() => {
     if (view === 'detail' && routeMonitorId && (!selectedMonitor || selectedMonitor.websiteId !== routeMonitorId)) {
-      const envParam = envFilter !== 'all' ? { env: envFilter } : {};
-      fetchDashboardData('monitor', { id: routeMonitorId, ...envParam })
+      fetchDashboardData('monitor', { id: routeMonitorId })
         .then(setSelectedMonitor)
         .catch(err => {
           console.error('Error loading monitor:', err);
           navigate('#/monitors');
         });
     }
-  }, [view, routeMonitorId, envFilter]);
+  }, [view, routeMonitorId]);
 
   // Show a toast notification that auto-dismisses
   const showToast = (message, type = 'success') => {
@@ -1369,11 +1345,9 @@ function App() {
       setLoading(true);
       setError(null);
 
-      const envParam = envFilter !== 'all' ? { env: envFilter } : {};
-
       const [overview, monitorList] = await Promise.all([
-        fetchDashboardData('overview', envParam),
-        fetchDashboardData('monitors', envParam)
+        fetchDashboardData('overview'),
+        fetchDashboardData('monitors')
       ]);
 
       setGlobalStats(overview.global);
@@ -1385,12 +1359,11 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [envFilter]);
+  }, []);
 
-  // Initial load + detect current environment
+  // Initial load
   useEffect(() => {
     loadData();
-    fetchEnvironment().then(setCurrentEnv);
   }, [loadData]);
   
   // Auto-refresh every 30 seconds (but not on detail view to avoid disrupting chart interactions)
@@ -1455,11 +1428,10 @@ function App() {
   // Refresh the current detail view fully (stats, charts, incidents)
   const refreshDetail = async (websiteId) => {
     try {
-      const envParam = envFilter !== 'all' ? { env: envFilter } : {};
       const [freshMonitor, overview, monitorList] = await Promise.all([
-        fetchDashboardData('monitor', { id: websiteId, ...envParam }),
-        fetchDashboardData('overview', envParam),
-        fetchDashboardData('monitors', envParam)
+        fetchDashboardData('monitor', { id: websiteId }),
+        fetchDashboardData('overview'),
+        fetchDashboardData('monitors')
       ]);
       setSelectedMonitor(freshMonitor);
       setGlobalStats(overview.global);
@@ -1602,43 +1574,6 @@ function App() {
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <select
-                  value={envFilter}
-                  onChange={(e) => setEnvFilter(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Data</option>
-                  <option value="production">Production</option>
-                  <option value="local">Local</option>
-                </select>
-                {envFilter === 'local' && (
-                  <button
-                    onClick={async () => {
-                      if (confirm('Clear ALL local check data and incidents? This cannot be undone.')) {
-                        try {
-                          const result = await clearEnvironmentData('local');
-                          await loadData();
-                          showToast(`Cleared ${result.deleted.checksDeleted} checks, ${result.deleted.incidentsDeleted} incidents`, 'success');
-                        } catch (err) {
-                          showToast('Failed to clear local data: ' + err.message, 'error');
-                        }
-                      }
-                    }}
-                    className="px-3 py-2 text-sm border border-red-400 text-red-600 rounded-lg hover:bg-red-50 transition"
-                    title="Delete all local environment data"
-                  >
-                    Clear Local
-                  </button>
-                )}
-              </div>
-              {currentEnv && (
-                <span className={`px-2 py-1 text-xs rounded font-medium ${
-                  currentEnv === 'production' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {currentEnv}
-                </span>
-              )}
               <button
                 onClick={handleCheckAll}
                 className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
@@ -1729,7 +1664,6 @@ function App() {
             onDeleteIncident={handleDeleteIncident}
             onDeleteAllIncidents={handleDeleteAllIncidents}
             onDeleteWebsite={handleDeleteWebsite}
-            envFilter={envFilter}
             onRefresh={() => refreshDetail(selectedMonitor.websiteId)}
             showToast={showToast}
           />

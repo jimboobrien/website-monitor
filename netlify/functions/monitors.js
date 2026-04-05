@@ -3,15 +3,13 @@ const {
   deleteIncident,
   deleteAllIncidents,
   deleteWebsite,
-  deleteEnvironmentData,
-  getEnvironment,
   getWebsite
 } = require('./lib/supabase');
 
 const headers = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'DELETE, OPTIONS',
   'Content-Type': 'application/json'
 };
 
@@ -25,15 +23,6 @@ const headers = {
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
-  }
-
-  // GET: return current environment info
-  if (event.httpMethod === 'GET') {
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ success: true, environment: getEnvironment() })
-    };
   }
 
   if (event.httpMethod !== 'DELETE') {
@@ -146,43 +135,12 @@ exports.handler = async (event, context) => {
       };
     }
 
-    if (action === 'delete-environment') {
-      const env = params.env;
-      if (!env) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ error: 'env parameter required (e.g. ?env=local)' })
-        };
-      }
-
-      if (env === 'production') {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ error: 'Cannot bulk-delete production data from this endpoint' })
-        };
-      }
-
-      const result = await deleteEnvironmentData(env);
-      console.log(`[DELETE] Cleared ${env} data: ${result.checksDeleted} checks, ${result.incidentsDeleted} incidents`);
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          message: `Cleared ${env} data`,
-          deleted: result
-        })
-      };
-    }
-
     return {
       statusCode: 400,
       headers,
       body: JSON.stringify({
         error: 'Invalid action',
-        validActions: ['delete-check', 'delete-incident', 'delete-all-incidents', 'delete-website', 'delete-environment']
+        validActions: ['delete-check', 'delete-incident', 'delete-all-incidents', 'delete-website']
       })
     };
   } catch (error) {

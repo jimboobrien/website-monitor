@@ -137,22 +137,6 @@ async function deleteAllIncidents(websiteId) {
   if (error) throw error;
 }
 
-async function deleteEnvironmentData(env) {
-  const supabase = getSupabaseClient();
-
-  const { count: checksDeleted } = await supabase
-    .from('monitor_checks')
-    .delete({ count: 'exact' })
-    .eq('environment', env);
-
-  const { count: incidentsDeleted } = await supabase
-    .from('incidents')
-    .delete({ count: 'exact' })
-    .eq('environment', env);
-
-  return { checksDeleted: checksDeleted || 0, incidentsDeleted: incidentsDeleted || 0 };
-}
-
 async function deleteWebsite(websiteId) {
   const supabase = getSupabaseClient();
 
@@ -227,6 +211,11 @@ async function updateClient(clientId, updates) {
  */
 
 async function saveMonitorCheck(check) {
+  if (getEnvironment() === 'local') {
+    console.log(`[SKIP ] Not saving check for ${check.websiteId} (local env)`);
+    return null;
+  }
+
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('monitor_checks')
@@ -238,8 +227,7 @@ async function saveMonitorCheck(check) {
       status_code: check.statusCode,
       error_message: check.error,
       issues: check.issues || [],
-      metadata: check.metadata || {},
-      environment: getEnvironment()
+      metadata: check.metadata || {}
     }])
     .select()
     .single();
@@ -248,23 +236,17 @@ async function saveMonitorCheck(check) {
   return data;
 }
 
-async function getMonitorChecks(websiteId, hours = 24, limit = 1000, { env } = {}) {
+async function getMonitorChecks(websiteId, hours = 24, limit = 1000) {
   const supabase = getSupabaseClient();
   const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
-  let query = supabase
+  const { data, error } = await supabase
     .from('monitor_checks')
     .select('*')
     .eq('website_id', websiteId)
     .gte('timestamp', cutoffTime)
     .order('timestamp', { ascending: false })
     .limit(limit);
-
-  if (env) {
-    query = query.eq('environment', env);
-  }
-
-  const { data, error } = await query;
   
   if (error) throw error;
   
@@ -282,20 +264,15 @@ async function getMonitorChecks(websiteId, hours = 24, limit = 1000, { env } = {
   }));
 }
 
-async function getLatestCheck(websiteId, { env } = {}) {
+async function getLatestCheck(websiteId) {
   const supabase = getSupabaseClient();
-  let query = supabase
+  const { data, error } = await supabase
     .from('monitor_checks')
     .select('*')
     .eq('website_id', websiteId)
     .order('timestamp', { ascending: false })
-    .limit(1);
-
-  if (env) {
-    query = query.eq('environment', env);
-  }
-
-  const { data, error } = await query.single();
+    .limit(1)
+    .single();
   
   if (error) {
     if (error.code === 'PGRST116') return null; // No rows found
@@ -342,6 +319,11 @@ async function getAllLatestChecks() {
  */
 
 async function createIncident(incident) {
+  if (getEnvironment() === 'local') {
+    console.log(`[SKIP ] Not creating incident for ${incident.websiteId} (local env)`);
+    return null;
+  }
+
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('incidents')
@@ -352,8 +334,7 @@ async function createIncident(incident) {
       incident_type: incident.type,
       severity: incident.severity,
       message: incident.message,
-      metadata: incident.metadata || {},
-      environment: getEnvironment()
+      metadata: incident.metadata || {}
     }])
     .select()
     .single();
@@ -392,7 +373,7 @@ async function getActiveIncidents(websiteId = null) {
   return data || [];
 }
 
-async function getRecentIncidents(websiteId = null, limit = 10, { env } = {}) {
+async function getRecentIncidents(websiteId = null, limit = 10) {
   const supabase = getSupabaseClient();
   let query = supabase
     .from('incidents')
@@ -400,10 +381,6 @@ async function getRecentIncidents(websiteId = null, limit = 10, { env } = {}) {
 
   if (websiteId) {
     query = query.eq('website_id', websiteId);
-  }
-
-  if (env) {
-    query = query.eq('environment', env);
   }
 
   const { data, error } = await query
@@ -597,8 +574,6 @@ module.exports = {
   deleteIncident,
   deleteAllIncidents,
   deleteWebsite,
-  deleteEnvironmentData,
-  getEnvironment,
   
   // Clients
   getAllClients,

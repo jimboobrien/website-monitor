@@ -54,12 +54,11 @@ exports.handler = async (event, context) => {
   try {
     const params = event.queryStringParameters || {};
     const action = params.action || 'overview';
-    const envFilter = params.env || undefined; // optional: ?env=production or ?env=local
 
     switch (action) {
       case 'overview': {
         // Get all monitor stats and global statistics
-        const monitorStats = await getAllMonitorStats({ env: envFilter });
+        const monitorStats = await getAllMonitorStats();
         const globalStats = getGlobalStats(monitorStats);
         
         return {
@@ -77,8 +76,8 @@ exports.handler = async (event, context) => {
 
       case 'monitors': {
         // Get all monitors with their statistics
-        const monitorStats = await getAllMonitorStats({ env: envFilter });
-        
+        const monitorStats = await getAllMonitorStats();
+
         // Optional: filter by client
         const clientId = params.client;
         const filteredStats = clientId
@@ -107,7 +106,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        const stats = await getMonitorStats(monitorId, { env: envFilter });
+        const stats = await getMonitorStats(monitorId);
         
         return {
           statusCode: 200,
@@ -122,7 +121,7 @@ exports.handler = async (event, context) => {
 
       case 'clients': {
         // Get monitors grouped by client
-        const monitorStats = await getAllMonitorStats({ env: envFilter });
+        const monitorStats = await getAllMonitorStats();
         const byClient = await getMonitorsByClient(monitorStats);
         
         return {
@@ -149,7 +148,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        const history = await getResponseTimeHistory(monitorId, hours, { env: envFilter });
+        const history = await getResponseTimeHistory(monitorId, hours);
         
         return {
           statusCode: 200,
@@ -175,7 +174,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        const history = await getUptimeHistory(monitorId, days, { env: envFilter });
+        const history = await getUptimeHistory(monitorId, days);
         
         return {
           statusCode: 200,
@@ -227,7 +226,7 @@ exports.handler = async (event, context) => {
           };
         }
 
-        const checks = await getMonitorChecks(monitorId, hours, 1000, { env: envFilter });
+        const checks = await getMonitorChecks(monitorId, hours, 1000);
 
         return {
           statusCode: 200,
