@@ -2,3 +2,24 @@
   command = "mkdir -p public"
   functions = "netlify/functions"
   publish = "public"
+
+[dev]
+  framework = "#static"
+
+# Scheduled Functions
+[functions]
+  node_bundler = "esbuild"
+
+# Scheduled functions DISABLED until Supabase migration is complete
+# Re-enable after updating monitor functions to save to Supabase database
+
+# [[plugins]]
+#   package = "@netlify/plugin-functions-cron"
+
+# # Basic HTTP monitoring - runs every 5 minutes
+# [functions."monitor"]
+#   schedule = "*/5 * * * *"
+
+# # Enhanced monitoring (visual + custom checks) - runs every 10 minutes
+# [functions."monitor-enhanced"]
+#   schedule = "*/10 * * * *"

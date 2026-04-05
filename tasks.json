@@ -1,0 +1,906 @@
+{
+  "project": "Website Status Monitor - UptimeRobot Clone",
+  "repository": "https://github.com/jimboobrien/website-monitor",
+  "currentPhase": "phase-4",
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Basic Monitoring (✅ Complete)",
+      "branch": "main",
+      "status": "completed",
+      "description": "HTTP uptime checking, response time tracking, email alerts",
+      "tasks": []
+    },
+    {
+      "id": "phase-2",
+      "name": "Advanced Monitoring (✅ Complete)",
+      "branch": "main",
+      "status": "completed",
+      "description": "Visual comparison, custom element checks, snapshot system",
+      "tasks": []
+    },
+    {
+      "id": "phase-3",
+      "name": "Dashboard UI Foundation",
+      "branch": "phase-3-dashboard",
+      "status": "completed",
+      "description": "Build the core dashboard with monitor list, status display, and real-time data",
+      "tasks": [
+        {
+          "id": "3.1",
+          "title": "Create dashboard data API endpoint",
+          "description": "Build Netlify function to serve monitor status data from storage",
+          "status": "completed",
+          "files": [
+            "netlify/functions/dashboard-data.js",
+            "netlify/functions/lib/dashboard-service.js"
+          ],
+          "features": [
+            "Read current status from storage",
+            "Calculate uptime percentages (24h, 7d, 30d, all-time)",
+            "Return response times history",
+            "Include last check timestamp",
+            "Support filtering by client"
+          ]
+        },
+        {
+          "id": "3.2",
+          "title": "Build React dashboard app structure",
+          "description": "Set up React app with routing and state management",
+          "status": "completed",
+          "files": [
+            "public/dashboard/index.html",
+            "public/dashboard/app.jsx",
+            "public/dashboard/components/",
+            "public/dashboard/styles.css"
+          ],
+          "features": [
+            "React 18 with hooks",
+            "Client-side routing (hash-based for static hosting)",
+            "Global state management (Context API or Zustand)",
+            "Auto-refresh every 30 seconds",
+            "Responsive mobile-first design"
+          ],
+          "dependencies": [
+            "react@18",
+            "react-dom@18",
+            "recharts (for graphs)",
+            "date-fns (for time formatting)"
+          ]
+        },
+        {
+          "id": "3.3",
+          "title": "Monitor list view component",
+          "description": "Display all monitors with status indicators",
+          "status": "completed",
+          "files": [
+            "public/dashboard/components/MonitorList.jsx",
+            "public/dashboard/components/MonitorCard.jsx",
+            "public/dashboard/components/StatusBadge.jsx"
+          ],
+          "features": [
+            "Grid/list view toggle",
+            "Status indicators (up=green, down=red, paused=gray)",
+            "Response time display",
+            "Last checked timestamp",
+            "Uptime percentage (24h)",
+            "Filter by client",
+            "Search by name/URL",
+            "Sort by: status, name, uptime, response time"
+          ]
+        },
+        {
+          "id": "3.4",
+          "title": "Monitor detail page",
+          "description": "Detailed view for individual monitor",
+          "status": "completed",
+          "files": [
+            "public/dashboard/components/MonitorDetail.jsx",
+            "public/dashboard/components/ResponseTimeChart.jsx",
+            "public/dashboard/components/UptimeChart.jsx"
+          ],
+          "features": [
+            "Current status and stats",
+            "Response time graph (24h)",
+            "Uptime bar chart (7d, 30d)",
+            "Recent incidents list",
+            "Monitor configuration display",
+            "Edit/pause/delete actions",
+            "Manual check trigger button"
+          ]
+        },
+        {
+          "id": "3.5",
+          "title": "Global stats dashboard",
+          "description": "Overview dashboard with aggregate statistics",
+          "status": "completed",
+          "files": [
+            "public/dashboard/components/Dashboard.jsx",
+            "public/dashboard/components/StatCard.jsx",
+            "public/dashboard/components/RecentIncidents.jsx"
+          ],
+          "features": [
+            "Total monitors count",
+            "Currently up/down counts",
+            "Average response time",
+            "Overall uptime percentage",
+            "Recent incidents feed",
+            "Monitors by client breakdown",
+            "Quick action buttons"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "name": "Database Migration & Monitor Management",
+      "branch": "phase-4-management",
+      "status": "pending",
+      "description": "Migrate to Supabase for persistent storage, then add CRUD operations for monitors, clients, and settings",
+      "prerequisites": [
+        "Supabase project created",
+        "Environment variables configured (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY)"
+      ],
+      "tasks": [
+        {
+          "id": "4.0.1",
+          "title": "Supabase database schema",
+          "description": "Design and create PostgreSQL schema for monitors, checks, incidents, and configuration",
+          "status": "completed",
+          "priority": "critical",
+          "blocksOtherTasks": true,
+          "files": [
+            "supabase/schema.sql",
+            "supabase/seed.sql",
+            "supabase/migrations/"
+          ],
+          "schema": {
+            "tables": [
+              "websites - Monitor configuration (replaces config.json)",
+              "clients - Client/customer information",
+              "monitor_checks - Time-series check results",
+              "incidents - Aggregated downtime events",
+              "visual_baselines - Metadata for baseline screenshots",
+              "alert_history - Email/notification log"
+            ],
+            "indexes": [
+              "idx_checks_website_timestamp - Fast time-series queries",
+              "idx_incidents_website_started - Incident lookups",
+              "idx_checks_status - Status filtering"
+            ],
+            "functions": [
+              "calculate_uptime(website_id, hours) - Server-side uptime calc",
+              "get_recent_incidents(website_id, limit) - Fast incident queries"
+            ]
+          },
+          "features": [
+            "Monitor configuration table (name, url, client_id, settings)",
+            "Time-series checks table (optimized for inserts)",
+            "Incidents table with start/end timestamps",
+            "Client management table",
+            "Indexes for fast queries",
+            "Foreign key constraints for data integrity",
+            "Partitioning for check data (future optimization)"
+          ]
+        },
+        {
+          "id": "4.0.2",
+          "title": "Supabase Storage setup",
+          "description": "Configure Storage buckets for screenshots and baselines",
+          "status": "completed",
+          "priority": "critical",
+          "blocksOtherTasks": true,
+          "files": [
+            "supabase/storage-policies.sql"
+          ],
+          "features": [
+            "Create 'baselines' bucket for visual comparison images",
+            "Create 'screenshots' bucket for snapshots",
+            "Set up RLS policies for security",
+            "Configure public URL access for images",
+            "Set retention policies (auto-delete old snapshots)"
+          ]
+        },
+        {
+          "id": "4.0.3",
+          "title": "Supabase client library",
+          "description": "Create reusable Supabase client and helper functions",
+          "status": "completed",
+          "priority": "high",
+          "dependencies": ["4.0.1", "4.0.2"],
+          "files": [
+            "netlify/functions/lib/supabase-client.js",
+            "netlify/functions/lib/supabase-storage.js"
+          ],
+          "features": [
+            "Initialize Supabase client with env vars",
+            "Connection pooling and error handling",
+            "Helper functions for common queries",
+            "Storage upload/download helpers",
+            "Query builders for time-series data",
+            "Transaction support for atomic operations"
+          ]
+        },
+        {
+          "id": "4.0.4",
+          "title": "Migrate storage.js to Supabase",
+          "description": "Replace file-based storage with Supabase database and storage",
+          "status": "completed",
+          "priority": "high",
+          "dependencies": ["4.0.3"],
+          "files": [
+            "netlify/functions/lib/storage.js - Rewrite",
+            "netlify/functions/lib/supabase-queries.js - New"
+          ],
+          "features": [
+            "Replace saveHistory() with Supabase insert",
+            "Replace loadHistory() with Supabase query",
+            "Replace baseline storage with Supabase Storage",
+            "Add batch insert for multiple checks",
+            "Add uptime calculation queries",
+            "Keep same API interface for backward compatibility",
+            "Add migration function for existing /tmp/ data"
+          ]
+        },
+        {
+          "id": "4.0.5",
+          "title": "Migrate config.json to database",
+          "description": "Move website and client configuration from JSON file to Supabase",
+          "status": "completed",
+          "priority": "medium",
+          "dependencies": ["4.0.4"],
+          "files": [
+            "netlify/functions/lib/config-loader.js - Rewrite",
+            "netlify/functions/config-migration.js - One-time script"
+          ],
+          "features": [
+            "Load websites from 'websites' table instead of config.json",
+            "Load clients from 'clients' table",
+            "Cache configuration in memory (5 min TTL)",
+            "Fallback to config.json if database unavailable",
+            "Migration script to import existing config.json",
+            "Keep config.json as backup/reference"
+          ]
+        },
+        {
+          "id": "4.0.6",
+          "title": "Update monitor functions to use Supabase",
+          "description": "Modify monitor.js and monitor-enhanced.js to write to Supabase",
+          "status": "completed",
+          "priority": "high",
+          "dependencies": ["4.0.4", "4.0.5"],
+          "files": [
+            "netlify/functions/monitor.js - Update",
+            "netlify/functions/monitor-enhanced.js - Update"
+          ],
+          "features": [
+            "Save check results to monitor_checks table",
+            "Save baselines to Supabase Storage",
+            "Create incidents on failure",
+            "Auto-resolve incidents on recovery",
+            "Batch insert for performance",
+            "Error handling and retries"
+          ]
+        },
+        {
+          "id": "4.0.7",
+          "title": "Update dashboard API to use Supabase",
+          "description": "Rewrite dashboard-data.js to query Supabase instead of file storage",
+          "status": "completed",
+          "priority": "high",
+          "dependencies": ["4.0.4"],
+          "files": [
+            "netlify/functions/dashboard-data.js - Rewrite",
+            "netlify/functions/lib/dashboard-service.js - Update queries"
+          ],
+          "features": [
+            "Rewrite overview query with SQL aggregation",
+            "Rewrite monitor stats with joins and GROUP BY",
+            "Optimize response-time query (indexed timestamp)",
+            "Optimize uptime-history with date_trunc",
+            "Add caching for frequently accessed data",
+            "5-10x faster dashboard load times"
+          ]
+        },
+        {
+          "id": "4.0.8",
+          "title": "Testing and validation",
+          "description": "Comprehensive testing of Supabase migration",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": ["4.0.6", "4.0.7"],
+          "files": [
+            "test-supabase.js",
+            "SUPABASE-MIGRATION.md"
+          ],
+          "features": [
+            "Test monitor check storage and retrieval",
+            "Test dashboard API performance",
+            "Verify data persistence across deploys",
+            "Load testing with realistic data",
+            "Verify visual baselines work",
+            "Test incident creation and resolution",
+            "Document migration process"
+          ]
+        },
+        {
+          "id": "4.1",
+          "title": "Monitor CRUD API endpoints",
+          "description": "Create/update/delete monitors via API",
+          "status": "pending",
+          "files": [
+            "netlify/functions/monitors.js",
+            "netlify/functions/lib/config-manager.js"
+          ],
+          "features": [
+            "POST /monitors - Create new monitor",
+            "PUT /monitors/:id - Update monitor",
+            "DELETE /monitors/:id - Delete monitor",
+            "PATCH /monitors/:id/pause - Pause/resume",
+            "Validate configuration",
+            "Update config.json atomically",
+            "Return validation errors"
+          ]
+        },
+        {
+          "id": "4.2",
+          "title": "Add/Edit monitor form",
+          "description": "UI for creating and editing monitors",
+          "status": "pending",
+          "files": [
+            "public/dashboard/components/MonitorForm.jsx",
+            "public/dashboard/components/CustomCheckBuilder.jsx",
+            "public/dashboard/components/VisualCheckSettings.jsx"
+          ],
+          "features": [
+            "Basic info: name, URL, client",
+            "Check interval selection",
+            "Visual check configuration toggle",
+            "Custom checks builder (add/remove/reorder)",
+            "Form validation",
+            "Test monitor before saving",
+            "Copy existing monitor",
+            "Import/export monitor config"
+          ]
+        },
+        {
+          "id": "4.3",
+          "title": "Client management",
+          "description": "Manage client groups",
+          "status": "pending",
+          "files": [
+            "public/dashboard/components/ClientManager.jsx",
+            "public/dashboard/components/ClientForm.jsx"
+          ],
+          "features": [
+            "List all clients",
+            "Add/edit/delete clients",
+            "Assign monitors to clients",
+            "Client-specific alert settings",
+            "Bulk operations"
+          ]
+        },
+        {
+          "id": "4.4",
+          "title": "Bulk operations",
+          "description": "Perform actions on multiple monitors",
+          "status": "pending",
+          "files": [
+            "public/dashboard/components/BulkActions.jsx"
+          ],
+          "features": [
+            "Multi-select monitors",
+            "Bulk pause/resume",
+            "Bulk delete",
+            "Bulk change client",
+            "Bulk export config"
+          ]
+        },
+        {
+          "id": "4.5",
+          "title": "Manual check trigger",
+          "description": "Manually run checks on-demand",
+          "status": "pending",
+          "files": [
+            "netlify/functions/check-now.js"
+          ],
+          "features": [
+            "Single monitor check",
+            "Bulk check multiple monitors",
+            "Return results immediately",
+            "Show progress indicator"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-5",
+      "name": "Incident & Alert Management",
+      "branch": "phase-5-incidents",
+      "status": "pending",
+      "description": "Incident tracking, alert settings, and notification management",
+      "tasks": [
+        {
+          "id": "5.1",
+          "title": "Incident tracking system",
+          "description": "Store and display incident history",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/incident-tracker.js",
+            "netlify/functions/incidents.js"
+          ],
+          "features": [
+            "Create incident on monitor failure",
+            "Track incident duration",
+            "Auto-resolve on recovery",
+            "Store incident metadata (type, message, screenshot)",
+            "Incident timeline per monitor",
+            "MTTR (Mean Time To Recovery) calculation"
+          ]
+        },
+        {
+          "id": "5.2",
+          "title": "Incident list and detail views",
+          "description": "UI for browsing incidents",
+          "status": "pending",
+          "files": [
+            "public/dashboard/components/IncidentList.jsx",
+            "public/dashboard/components/IncidentDetail.jsx"
+          ],
+          "features": [
+            "List all incidents (open and resolved)",
+            "Filter by monitor, client, date range, type",
+            "Incident detail with full context",
+            "Visual diff screenshots for visual incidents",
+            "Failed check details",
+            "Manual incident notes",
+            "Acknowledge/resolve manually"
+          ]
+        },
+        {
+          "id": "5.3",
+          "title": "Alert configuration UI",
+          "description": "Manage notification settings",
+          "status": "pending",
+          "files": [
+            "public/dashboard/components/AlertSettings.jsx",
+            "netlify/functions/alert-config.js"
+          ],
+          "features": [
+            "Email notification toggles",
+            "Alert threshold settings",
+            "Notification schedule (business hours only, etc.)",
+            "Alert grouping preferences",
+            "Email template customization",
+            "Test alert sending"
+          ]
+        },
+        {
+          "id": "5.4",
+          "title": "Status page generator",
+          "description": "Public status page for monitors",
+          "status": "pending",
+          "files": [
+            "netlify/functions/status-page.js",
+            "public/status/index.html"
+          ],
+          "features": [
+            "Public URL for status page",
+            "Real-time monitor status",
+            "Uptime history bars",
+            "Current incidents display",
+            "Incident timeline",
+            "Subscribe to updates",
+            "Custom branding/colors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-6",
+      "name": "Advanced Features",
+      "branch": "phase-6-advanced",
+      "status": "pending",
+      "description": "Enhanced monitoring capabilities and integrations",
+      "tasks": [
+        {
+          "id": "6.1",
+          "title": "Multi-region checking",
+          "description": "Check from multiple locations",
+          "status": "pending",
+          "files": [
+            "netlify/functions/multi-region-check.js"
+          ],
+          "features": [
+            "Deploy to multiple Netlify regions",
+            "Aggregate results from all regions",
+            "Region-specific status display",
+            "Alert only on multi-region failures",
+            "Regional response time comparison"
+          ]
+        },
+        {
+          "id": "6.2",
+          "title": "SSL/TLS certificate monitoring",
+          "description": "Track SSL certificate expiration",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/ssl-check.js"
+          ],
+          "features": [
+            "Certificate expiration date",
+            "Alert X days before expiry",
+            "Certificate chain validation",
+            "Certificate issuer info",
+            "HTTPS enforcement check"
+          ]
+        },
+        {
+          "id": "6.3",
+          "title": "Performance monitoring",
+          "description": "Core Web Vitals and performance metrics",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/performance-check.js"
+          ],
+          "features": [
+            "LCP (Largest Contentful Paint)",
+            "FID (First Input Delay)",
+            "CLS (Cumulative Layout Shift)",
+            "Time to First Byte",
+            "Page load time",
+            "Resource size tracking",
+            "Performance score trends"
+          ]
+        },
+        {
+          "id": "6.4",
+          "title": "Webhook integrations",
+          "description": "Send alerts to third-party services",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/webhook-dispatcher.js"
+          ],
+          "features": [
+            "Slack notifications",
+            "Discord webhooks",
+            "Microsoft Teams",
+            "PagerDuty integration",
+            "Custom webhook URLs",
+            "Webhook retry logic"
+          ]
+        },
+        {
+          "id": "6.5",
+          "title": "API monitoring",
+          "description": "Monitor REST API endpoints",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/api-check.js"
+          ],
+          "features": [
+            "Custom HTTP methods (POST, PUT, DELETE)",
+            "Request headers and body",
+            "Response validation (JSON schema, status code)",
+            "Response time thresholds",
+            "Authentication (Bearer, API key)",
+            "Response body assertion"
+          ]
+        },
+        {
+          "id": "6.6",
+          "title": "Maintenance windows",
+          "description": "Schedule downtime without alerts",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/maintenance-scheduler.js",
+            "public/dashboard/components/MaintenanceScheduler.jsx"
+          ],
+          "features": [
+            "Schedule maintenance windows",
+            "Pause monitoring during window",
+            "Display on status page",
+            "One-time or recurring windows",
+            "Automatic resume after window"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-7",
+      "name": "Reporting & Analytics",
+      "branch": "phase-7-reporting",
+      "status": "pending",
+      "description": "Historical analysis, reports, and data visualization",
+      "tasks": [
+        {
+          "id": "7.1",
+          "title": "Data retention and archiving",
+          "description": "Implement data retention policies and archiving for long-term storage",
+          "status": "pending",
+          "note": "Database migration completed in Phase 4 - this task is about optimization",
+          "files": [
+            "netlify/functions/lib/data-archiver.js",
+            "supabase/retention-policies.sql"
+          ],
+          "features": [
+            "Archive old check data (>90 days) to separate table",
+            "Aggregate daily/weekly/monthly stats into summary tables",
+            "Data retention policies (auto-delete after X days)",
+            "Export historical data to CSV/JSON",
+            "Compress old snapshots",
+            "Table partitioning for performance"
+          ]
+        },
+        {
+          "id": "7.2",
+          "title": "Advanced analytics dashboard",
+          "description": "Detailed charts and insights",
+          "status": "pending",
+          "files": [
+            "public/dashboard/components/Analytics.jsx",
+            "public/dashboard/components/charts/"
+          ],
+          "features": [
+            "Response time trends over time",
+            "Uptime trends by monitor/client",
+            "Incident frequency heatmap",
+            "Downtime by hour/day of week",
+            "Performance score history",
+            "Comparative analysis between monitors"
+          ]
+        },
+        {
+          "id": "7.3",
+          "title": "Automated reports",
+          "description": "Scheduled email/PDF reports",
+          "status": "pending",
+          "files": [
+            "netlify/functions/generate-report.js",
+            "netlify/functions/lib/report-generator.js"
+          ],
+          "features": [
+            "Daily/weekly/monthly report schedule",
+            "PDF report generation",
+            "Email delivery",
+            "Custom report templates",
+            "Include graphs and charts",
+            "Executive summary format"
+          ]
+        },
+        {
+          "id": "7.4",
+          "title": "SLA tracking and reporting",
+          "description": "Monitor SLA compliance",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/sla-tracker.js",
+            "public/dashboard/components/SLAReport.jsx"
+          ],
+          "features": [
+            "Define SLA targets per monitor",
+            "Track compliance percentage",
+            "Alert on SLA breach",
+            "Monthly SLA reports",
+            "SLA credits calculation",
+            "Client-facing SLA dashboard"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-8",
+      "name": "User Management & Multi-tenancy",
+      "branch": "phase-8-users",
+      "status": "pending",
+      "description": "Authentication, user roles, and team collaboration",
+      "tasks": [
+        {
+          "id": "8.1",
+          "title": "Authentication system",
+          "description": "User login and session management using Supabase Auth",
+          "status": "pending",
+          "note": "Uses Supabase Auth (already integrated in Phase 4) - just add UI and RLS policies",
+          "files": [
+            "public/dashboard/components/Login.jsx",
+            "public/dashboard/components/Register.jsx",
+            "netlify/functions/lib/auth-middleware.js",
+            "supabase/auth-policies.sql"
+          ],
+          "features": [
+            "Email/password authentication (Supabase Auth)",
+            "Magic link login",
+            "Password reset flow (built-in)",
+            "Session management (automatic)",
+            "OAuth integration (Google, GitHub) - Supabase built-in",
+            "Row-level security policies"
+          ]
+        },
+        {
+          "id": "8.2",
+          "title": "User roles and permissions",
+          "description": "Role-based access control",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/rbac.js",
+            "public/dashboard/components/UserManagement.jsx"
+          ],
+          "features": [
+            "Admin, Editor, Viewer roles",
+            "Per-client access control",
+            "Action permissions (create, edit, delete, view)",
+            "Audit log of user actions",
+            "Invite team members"
+          ]
+        },
+        {
+          "id": "8.3",
+          "title": "Team collaboration",
+          "description": "Multi-user features",
+          "status": "pending",
+          "files": [
+            "public/dashboard/components/TeamDashboard.jsx"
+          ],
+          "features": [
+            "Share monitors with team",
+            "Comment on incidents",
+            "Assign incidents to users",
+            "Team activity feed",
+            "On-call schedule"
+          ]
+        },
+        {
+          "id": "8.4",
+          "title": "Multi-tenancy support",
+          "description": "Separate workspaces for different organizations",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/tenant-isolation.js"
+          ],
+          "features": [
+            "Organization/workspace concept",
+            "Data isolation between tenants",
+            "Per-tenant configuration",
+            "White-label branding",
+            "Usage quotas per tenant"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase-9",
+      "name": "Mobile & Progressive Web App",
+      "branch": "phase-9-mobile",
+      "status": "pending",
+      "description": "Mobile-optimized experience and PWA features",
+      "tasks": [
+        {
+          "id": "9.1",
+          "title": "Progressive Web App setup",
+          "description": "Make dashboard installable",
+          "status": "pending",
+          "files": [
+            "public/manifest.json",
+            "public/service-worker.js"
+          ],
+          "features": [
+            "Service worker for offline support",
+            "App manifest",
+            "Installable on mobile/desktop",
+            "Push notifications support",
+            "Offline status viewing"
+          ]
+        },
+        {
+          "id": "9.2",
+          "title": "Mobile-optimized UI",
+          "description": "Enhanced mobile experience",
+          "status": "pending",
+          "files": [
+            "public/dashboard/styles/mobile.css"
+          ],
+          "features": [
+            "Touch-friendly controls",
+            "Swipe gestures",
+            "Bottom navigation",
+            "Compact monitor cards",
+            "Mobile chart rendering"
+          ]
+        },
+        {
+          "id": "9.3",
+          "title": "Push notifications",
+          "description": "Real-time mobile alerts",
+          "status": "pending",
+          "files": [
+            "netlify/functions/lib/push-notifier.js"
+          ],
+          "features": [
+            "Browser push notifications",
+            "Mobile push via FCM",
+            "Notification preferences",
+            "Sound and vibration control",
+            "Rich notifications with actions"
+          ]
+        }
+      ]
+    }
+  ],
+  "uptimeRobotFeatureMatrix": {
+    "description": "Feature comparison with UptimeRobot.com",
+    "features": {
+      "Monitor Types": {
+        "HTTP(s)": "✅ Phase 1",
+        "Ping": "❌ Future",
+        "Port": "❌ Future",
+        "Keyword": "✅ Phase 2 (text-contains check)"
+      },
+      "Dashboard": {
+        "Monitor List": "🚧 Phase 3",
+        "Status Indicators": "🚧 Phase 3",
+        "Response Time Charts": "🚧 Phase 3",
+        "Uptime Percentage": "🚧 Phase 3",
+        "Global Stats": "🚧 Phase 3"
+      },
+      "Alerting": {
+        "Email Alerts": "✅ Phase 1",
+        "SMS": "❌ Future",
+        "Slack": "⏳ Phase 6",
+        "Discord": "⏳ Phase 6",
+        "Webhook": "⏳ Phase 6",
+        "Push Notifications": "⏳ Phase 9"
+      },
+      "Advanced": {
+        "Visual Comparison": "✅ Phase 2 (Better than UR!)",
+        "Custom Element Checks": "✅ Phase 2 (Better than UR!)",
+        "Multi-region": "⏳ Phase 6",
+        "SSL Monitoring": "⏳ Phase 6",
+        "Status Page": "⏳ Phase 5",
+        "Maintenance Windows": "⏳ Phase 6"
+      },
+      "Reporting": {
+        "Incident History": "⏳ Phase 5",
+        "Analytics": "⏳ Phase 7",
+        "SLA Reports": "⏳ Phase 7",
+        "PDF Reports": "⏳ Phase 7"
+      },
+      "Management": {
+        "Monitor CRUD": "⏳ Phase 4",
+        "Bulk Operations": "⏳ Phase 4",
+        "API Access": "⏳ Phase 4",
+        "User Management": "⏳ Phase 8",
+        "Team Features": "⏳ Phase 8"
+      }
+    }
+  },
+  "technicalDecisions": {
+    "frontend": {
+      "framework": "React 18 (via CDN for simplicity)",
+      "styling": "Tailwind CSS (via CDN) + custom CSS",
+      "state": "React Context API or Zustand",
+      "routing": "Hash-based routing (no server required)",
+      "charts": "Recharts or Chart.js",
+      "icons": "Lucide React or Heroicons"
+    },
+    "backend": {
+      "functions": "Netlify Functions (Node.js)",
+      "database": "Supabase (PostgreSQL) - Phase 4",
+      "storage": "Supabase Storage for images/files",
+      "auth": "Supabase Auth (Phase 8)",
+      "email": "SendGrid (existing)",
+      "caching": "In-memory + /tmp/ for function-level cache"
+    },
+    "deployment": {
+      "platform": "Netlify",
+      "ci_cd": "GitHub Actions (optional)",
+      "hosting": "Netlify static hosting"
+    }
+  },
+  "nextSteps": [
+    "✅ Phase 3 Complete - Dashboard UI is live!",
+    "→ User creates Supabase project and provides credentials",
+    "→ Start Phase 4 with Supabase migration (tasks 4.0.1-4.0.8)",
+    "→ Then continue with Monitor Management (tasks 4.1-4.5)",
+    "→ Merge phase-3-dashboard to main and deploy"
+  ]
+}
