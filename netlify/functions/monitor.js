@@ -12,25 +12,37 @@ const {
 } = require('./lib/supabase');
 
 // Initialize SendGrid
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 /**
  * Check if a website is up and responding
  */
-async function checkWebsite(url) {
+async function checkWebsite(site) {
   const startTime = Date.now();
+  const url = site.url;
+  const name = site.name || url;
+
+  console.log(`[CHECK] ${name} — ${url}`);
 
   try {
     const response = await fetch(url, {
       method: 'GET',
-      timeout: 10000, // 10 second timeout
+      timeout: 10000,
       headers: {
         'User-Agent': 'WebsiteStatusMonitor/1.0'
       }
     });
 
     const responseTime = Date.now() - startTime;
-    const isUp = response.ok; // Status 200-299
+    const isUp = response.ok;
+
+    if (isUp) {
+      console.log(`[  OK ] ${name} — ${response.status} in ${responseTime}ms`);
+    } else {
+      console.warn(`[WARN ] ${name} — HTTP ${response.status} ${response.statusText} in ${responseTime}ms`);
+    }
 
     return {
       url,
@@ -41,12 +53,15 @@ async function checkWebsite(url) {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
+    const responseTime = Date.now() - startTime;
+    console.error(`[FAIL ] ${name} — ${error.message} (${responseTime}ms)`);
+
     return {
       url,
       status: 0,
       statusText: error.message,
       isUp: false,
-      responseTime: Date.now() - startTime,
+      responseTime,
       timestamp: new Date().toISOString(),
       error: error.message
     };
@@ -81,6 +96,11 @@ async function sendAlert(results) {
 
   if (downSites.length === 0) {
     return null;
+  }
+
+  if (!process.env.SENDGRID_API_KEY || !process.env.ALERT_EMAIL || !process.env.FROM_EMAIL) {
+    console.warn('[ALERT] Skipping email — missing SENDGRID_API_KEY, ALERT_EMAIL, or FROM_EMAIL');
+    return { sent: false, error: 'Missing email configuration' };
   }
 
   let emailBody = `
@@ -140,6 +160,7 @@ async function sendAlert(results) {
 
   try {
     await sgMail.send(msg);
+    console.log(`[ALERT] Email sent to ${process.env.ALERT_EMAIL} — ${downSites.length} site(s) down`);
 
     // Log alert history for each affected site
     await Promise.all(downSites.map(site =>
@@ -149,12 +170,25 @@ async function sendAlert(results) {
         recipient: process.env.ALERT_EMAIL,
         subject,
         success: true
-      }).catch(err => console.error(`Failed to log alert for ${site.websiteId}:`, err))
+      }).catch(err => console.error(`[ALERT] Failed to log alert history for ${site.websiteId}:`, err))
     ));
 
     return { sent: true, downSites: downSites.length };
   } catch (error) {
-    console.error('SendGrid error:', error);
+    console.error(`[ALERT] SendGrid error: ${error.message}`);
+
+    // Log the failed alert attempt
+    await Promise.all(downSites.map(site =>
+      saveAlertHistory({
+        websiteId: site.websiteId,
+        type: 'down',
+        recipient: process.env.ALERT_EMAIL,
+        subject,
+        success: false,
+        error: error.message
+      }).catch(() => {})
+    ));
+
     return { sent: false, error: error.message };
   }
 }
@@ -163,24 +197,37 @@ async function sendAlert(results) {
  * Main monitoring function
  */
 const monitorHandler = async (event, context) => {
-  console.log('Starting website monitoring check...');
-
-  // Check if required environment variables are set
-  if (!process.env.SENDGRID_API_KEY || !process.env.ALERT_EMAIL) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error: 'Missing required environment variables: SENDGRID_API_KEY, ALERT_EMAIL'
-      })
-    };
-  }
+  const runStart = Date.now();
+  console.log('='.repeat(60));
+  console.log(`[START] Website monitor check — ${new Date().toISOString()}`);
+  console.log('='.repeat(60));
 
   try {
     // Load websites and clients from Supabase
-    const [websites, clients] = await Promise.all([
-      getAllWebsites(),
-      getAllClients()
-    ]);
+    console.log('[LOAD ] Fetching websites and clients from Supabase...');
+    let websites, clients;
+    try {
+      [websites, clients] = await Promise.all([
+        getAllWebsites(),
+        getAllClients()
+      ]);
+    } catch (err) {
+      console.error(`[FATAL] Failed to load data from Supabase: ${err.message}`);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to connect to Supabase', detail: err.message })
+      };
+    }
+
+    console.log(`[LOAD ] Found ${websites.length} websites, ${clients.length} clients`);
+
+    if (websites.length === 0) {
+      console.warn('[LOAD ] No websites to check — exiting');
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: 'No websites configured', timestamp: new Date().toISOString() })
+      };
+    }
 
     // Create a client lookup map
     const clientMap = {};
@@ -189,7 +236,13 @@ const monitorHandler = async (event, context) => {
     });
 
     // Get active incidents to track recovery
-    const activeIncidents = await getActiveIncidents();
+    let activeIncidents = [];
+    try {
+      activeIncidents = await getActiveIncidents();
+    } catch (err) {
+      console.warn(`[WARN ] Failed to load active incidents: ${err.message} — continuing without incident tracking`);
+    }
+
     const activeIncidentsByWebsite = {};
     activeIncidents.forEach(inc => {
       if (!activeIncidentsByWebsite[inc.website_id]) {
@@ -198,10 +251,17 @@ const monitorHandler = async (event, context) => {
       activeIncidentsByWebsite[inc.website_id].push(inc);
     });
 
-    // Check all websites and attach client info
+    if (activeIncidents.length > 0) {
+      console.log(`[LOAD ] ${activeIncidents.length} active incident(s) being tracked`);
+    }
+
+    // Check all websites
+    console.log(`[CHECK] Checking ${websites.length} websites...`);
+    console.log('-'.repeat(60));
+
     const results = await Promise.all(
       websites.map(async (site) => {
-        const result = await checkWebsite(site.url);
+        const result = await checkWebsite(site);
 
         // Attach additional metadata
         result.name = site.name || site.url;
@@ -210,70 +270,85 @@ const monitorHandler = async (event, context) => {
         result.client = site.client_id ? clientMap[site.client_id] : null;
 
         // Save check result to Supabase
-        await saveMonitorCheck({
-          websiteId: site.id,
-          timestamp: result.timestamp,
-          status: result.isUp ? 'up' : 'down',
-          responseTime: result.responseTime,
-          statusCode: result.status,
-          error: result.error || null,
-          issues: []
-        });
+        try {
+          await saveMonitorCheck({
+            websiteId: site.id,
+            timestamp: result.timestamp,
+            status: result.isUp ? 'up' : 'down',
+            responseTime: result.responseTime,
+            statusCode: result.status,
+            error: result.error || null,
+            issues: []
+          });
+        } catch (err) {
+          console.error(`[DB   ] Failed to save check for ${site.name}: ${err.message}`);
+        }
 
         // Handle incident tracking
         const siteActiveIncidents = activeIncidentsByWebsite[site.id] || [];
 
-        if (!result.isUp && siteActiveIncidents.length === 0) {
-          // Site just went down — create incident
-          await createIncident({
-            websiteId: site.id,
-            startedAt: result.timestamp,
-            type: 'down',
-            severity: 'critical',
-            message: `${site.name} is down: ${result.error || `HTTP ${result.status}`}`
-          });
-        } else if (result.isUp && siteActiveIncidents.length > 0) {
-          // Site recovered — resolve active incidents
-          await Promise.all(
-            siteActiveIncidents.map(inc =>
-              resolveIncident(inc.id, result.timestamp)
-            )
-          );
+        try {
+          if (!result.isUp && siteActiveIncidents.length === 0) {
+            await createIncident({
+              websiteId: site.id,
+              startedAt: result.timestamp,
+              type: 'down',
+              severity: 'critical',
+              message: `${site.name} is down: ${result.error || `HTTP ${result.status}`}`
+            });
+            console.log(`[INCID] Created incident for ${site.name}`);
+          } else if (result.isUp && siteActiveIncidents.length > 0) {
+            await Promise.all(
+              siteActiveIncidents.map(inc => resolveIncident(inc.id, result.timestamp))
+            );
+            console.log(`[RECOV] ${site.name} recovered — resolved ${siteActiveIncidents.length} incident(s)`);
+          }
+        } catch (err) {
+          console.error(`[INCID] Failed to update incidents for ${site.name}: ${err.message}`);
         }
 
         return result;
       })
     );
 
+    // Summary
+    const sitesUp = results.filter(r => r.isUp).length;
+    const sitesDown = results.filter(r => !r.isUp).length;
+
+    console.log('-'.repeat(60));
+    console.log(`[DONE ] ${results.length} checked — ${sitesUp} up, ${sitesDown} down`);
+
     // Send alerts if any sites are down
-    const alertResult = await sendAlert(results);
+    let alertResult = null;
+    if (sitesDown > 0) {
+      console.log(`[ALERT] ${sitesDown} site(s) down — sending alert...`);
+      alertResult = await sendAlert(results);
+    }
 
     // Group results by client
     const byClient = groupByClient(results);
 
-    // Prepare response
-    const response = {
-      timestamp: new Date().toISOString(),
-      totalChecked: results.length,
-      sitesUp: results.filter(r => r.isUp).length,
-      sitesDown: results.filter(r => !r.isUp).length,
-      results: results,
-      byClient: byClient,
-      alertSent: alertResult
-    };
-
-    console.log('Monitoring check complete:', {
-      totalChecked: response.totalChecked,
-      sitesUp: response.sitesUp,
-      sitesDown: response.sitesDown
-    });
+    const duration = Date.now() - runStart;
+    console.log(`[END  ] Monitor run complete in ${duration}ms`);
+    console.log('='.repeat(60));
 
     return {
       statusCode: 200,
-      body: JSON.stringify(response, null, 2)
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+        duration,
+        totalChecked: results.length,
+        sitesUp,
+        sitesDown,
+        results,
+        byClient,
+        alertSent: alertResult
+      }, null, 2)
     };
   } catch (error) {
-    console.error('Monitoring error:', error);
+    const duration = Date.now() - runStart;
+    console.error(`[FATAL] Monitor run failed after ${duration}ms: ${error.message}`);
+    console.error(error.stack);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })

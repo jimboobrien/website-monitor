@@ -24,8 +24,12 @@ if (process.env.SENDGRID_API_KEY) {
 /**
  * Check if a website is up and responding
  */
-async function checkWebsite(url) {
+async function checkWebsite(site) {
   const startTime = Date.now();
+  const url = site.url;
+  const name = site.name || url;
+
+  console.log(`[CHECK] ${name} — ${url}`);
 
   try {
     const response = await fetch(url, {
@@ -39,6 +43,12 @@ async function checkWebsite(url) {
     const responseTime = Date.now() - startTime;
     const isUp = response.ok;
 
+    if (isUp) {
+      console.log(`[  OK ] ${name} — ${response.status} in ${responseTime}ms`);
+    } else {
+      console.warn(`[WARN ] ${name} — HTTP ${response.status} ${response.statusText} in ${responseTime}ms`);
+    }
+
     return {
       url,
       status: response.status,
@@ -48,12 +58,15 @@ async function checkWebsite(url) {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
+    const responseTime = Date.now() - startTime;
+    console.error(`[FAIL ] ${name} — ${error.message} (${responseTime}ms)`);
+
     return {
       url,
       status: 0,
       statusText: error.message,
       isUp: false,
-      responseTime: Date.now() - startTime,
+      responseTime,
       timestamp: new Date().toISOString(),
       error: error.message
     };
@@ -69,48 +82,78 @@ async function runEnhancedChecks(site) {
     visual: null,
     custom: null
   };
+  const name = site.name || site.url;
 
   // Run visual check if configured
   if (site.visual_check_enabled) {
     const websiteId = site.id;
+    console.log(`[VISUAL] ${name} — loading baseline...`);
 
     // Load baseline from Supabase storage
-    const baselineUrl = await getBaselineUrl(websiteId);
     let baseline = null;
-    if (baselineUrl) {
-      try {
+    try {
+      const baselineUrl = await getBaselineUrl(websiteId);
+      if (baselineUrl) {
         const res = await fetch(baselineUrl);
         if (res.ok) {
           baseline = Buffer.from(await res.arrayBuffer());
+          console.log(`[VISUAL] ${name} — baseline loaded (${(baseline.length / 1024).toFixed(1)}KB)`);
+        } else {
+          console.warn(`[VISUAL] ${name} — baseline fetch returned ${res.status}`);
         }
-      } catch (err) {
-        console.error(`Failed to fetch baseline for ${websiteId}:`, err);
+      } else {
+        console.log(`[VISUAL] ${name} — no baseline exists, will create one`);
       }
+    } catch (err) {
+      console.error(`[VISUAL] ${name} — failed to fetch baseline: ${err.message}`);
     }
 
-    const visualResult = await visualCheck(site.url, baseline, {
-      threshold: 5.0,
-      fullPage: false
-    });
+    try {
+      console.log(`[VISUAL] ${name} — taking screenshot...`);
+      const visualResult = await visualCheck(site.url, baseline, {
+        threshold: 5.0,
+        fullPage: false
+      });
 
-    // If this is a new baseline, save it to Supabase storage
-    if (visualResult.success && visualResult.isBaseline) {
-      await uploadBaseline(websiteId, visualResult.screenshot);
+      if (visualResult.success && visualResult.isBaseline) {
+        console.log(`[VISUAL] ${name} — saving new baseline`);
+        await uploadBaseline(websiteId, visualResult.screenshot);
+      } else if (visualResult.success && visualResult.hasChanged) {
+        console.warn(`[VISUAL] ${name} — visual change detected: ${visualResult.diffPercentage}% diff`);
+      } else if (visualResult.success) {
+        console.log(`[VISUAL] ${name} — no change (${visualResult.diffPercentage || 0}% diff)`);
+      }
+
+      // Save current screenshot
+      if (visualResult.success && visualResult.screenshot) {
+        const filename = `check-${Date.now()}.png`;
+        try {
+          await uploadScreenshot(websiteId, visualResult.screenshot, filename);
+        } catch (err) {
+          console.error(`[VISUAL] ${name} — failed to upload screenshot: ${err.message}`);
+        }
+      }
+
+      results.visual = visualResult;
+    } catch (err) {
+      console.error(`[VISUAL] ${name} — visual check failed: ${err.message}`);
+      results.visual = { success: false, error: err.message };
     }
-
-    // Save current screenshot to Supabase storage
-    if (visualResult.success && visualResult.screenshot) {
-      const filename = `check-${Date.now()}.png`;
-      await uploadScreenshot(websiteId, visualResult.screenshot, filename);
-    }
-
-    results.visual = visualResult;
   }
 
   // Run custom checks if configured
   if (site.custom_checks && site.custom_checks.length > 0) {
-    const customResult = await runCustomChecks(site.url, site.custom_checks);
-    results.custom = customResult;
+    console.log(`[CUSTOM] ${name} — running ${site.custom_checks.length} custom check(s)...`);
+    try {
+      const customResult = await runCustomChecks(site.url, site.custom_checks);
+      const passed = customResult.results?.filter(c => c.passed).length || 0;
+      const total = customResult.results?.length || 0;
+      console.log(`[CUSTOM] ${name} — ${passed}/${total} checks passed`);
+      results.custom = customResult;
+    } catch (err) {
+      console.error(`[CUSTOM] ${name} — custom checks failed: ${err.message}`);
+      results.custom = { error: err.message, results: [] };
+    }
   }
 
   return results;
@@ -167,25 +210,30 @@ function collectIssues(enhanced) {
  * Send email alert via SendGrid
  */
 async function sendAlert(results) {
-  const issues = results.filter(r =>
+  const issueResults = results.filter(r =>
     !r.isUp ||
     (r.enhanced?.visual?.hasChanged) ||
     (r.enhanced?.custom?.results?.some(c => !c.passed))
   );
 
-  if (issues.length === 0) {
+  if (issueResults.length === 0) {
     return null;
+  }
+
+  if (!process.env.SENDGRID_API_KEY || !process.env.ALERT_EMAIL || !process.env.FROM_EMAIL) {
+    console.warn('[ALERT] Skipping email — missing SENDGRID_API_KEY, ALERT_EMAIL, or FROM_EMAIL');
+    return { sent: false, error: 'Missing email configuration' };
   }
 
   let emailBody = `
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h2 style="color: #e74c3c;">⚠️ Website Monitoring Alert</h2>
   <p style="font-size: 16px; color: #333;">
-    <strong>${issues.length}</strong> website${issues.length > 1 ? 's have' : ' has'} issues detected.
+    <strong>${issueResults.length}</strong> website${issueResults.length > 1 ? 's have' : ' has'} issues detected.
   </p>
 `;
 
-  const grouped = groupByClient(issues);
+  const grouped = groupByClient(issueResults);
 
   Object.values(grouped).forEach(group => {
     const clientName = group.client.name || 'Uncategorized';
@@ -256,7 +304,7 @@ async function sendAlert(results) {
 </div>
 `;
 
-  const subject = `🚨 Website Alert - ${issues.length} issue(s) detected`;
+  const subject = `🚨 Website Alert - ${issueResults.length} issue(s) detected`;
   const msg = {
     to: process.env.ALERT_EMAIL,
     from: process.env.FROM_EMAIL,
@@ -266,21 +314,35 @@ async function sendAlert(results) {
 
   try {
     await sgMail.send(msg);
+    console.log(`[ALERT] Email sent to ${process.env.ALERT_EMAIL} — ${issueResults.length} site(s) with issues`);
 
     // Log alert history for each affected site
-    await Promise.all(issues.map(site =>
+    await Promise.all(issueResults.map(site =>
       saveAlertHistory({
         websiteId: site.websiteId,
         type: site.isUp ? 'issue' : 'down',
         recipient: process.env.ALERT_EMAIL,
         subject,
         success: true
-      }).catch(err => console.error(`Failed to log alert for ${site.websiteId}:`, err))
+      }).catch(err => console.error(`[ALERT] Failed to log alert history for ${site.websiteId}:`, err))
     ));
 
-    return { sent: true, issues: issues.length };
+    return { sent: true, issues: issueResults.length };
   } catch (error) {
-    console.error('SendGrid error:', error);
+    console.error(`[ALERT] SendGrid error: ${error.message}`);
+
+    // Log the failed alert attempt
+    await Promise.all(issueResults.map(site =>
+      saveAlertHistory({
+        websiteId: site.websiteId,
+        type: site.isUp ? 'issue' : 'down',
+        recipient: process.env.ALERT_EMAIL,
+        subject,
+        success: false,
+        error: error.message
+      }).catch(() => {})
+    ));
+
     return { sent: false, error: error.message };
   }
 }
@@ -289,14 +351,42 @@ async function sendAlert(results) {
  * Main monitoring function (Enhanced Phase 2)
  */
 const monitorHandler = async (event, context) => {
-  console.log('Starting enhanced website monitoring check (Phase 2)...');
+  const runStart = Date.now();
+  console.log('='.repeat(60));
+  console.log(`[START] Enhanced monitor check — ${new Date().toISOString()}`);
+  console.log('='.repeat(60));
 
   try {
     // Load websites and clients from Supabase
-    const [websites, clients] = await Promise.all([
-      getAllWebsites(),
-      getAllClients()
-    ]);
+    console.log('[LOAD ] Fetching websites and clients from Supabase...');
+    let websites, clients;
+    try {
+      [websites, clients] = await Promise.all([
+        getAllWebsites(),
+        getAllClients()
+      ]);
+    } catch (err) {
+      console.error(`[FATAL] Failed to load data from Supabase: ${err.message}`);
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Failed to connect to Supabase', detail: err.message })
+      };
+    }
+
+    console.log(`[LOAD ] Found ${websites.length} websites, ${clients.length} clients`);
+
+    const enhancedSites = websites.filter(s => s.visual_check_enabled || (s.custom_checks && s.custom_checks.length > 0));
+    console.log(`[LOAD ] ${enhancedSites.length} site(s) have enhanced checks enabled`);
+
+    if (websites.length === 0) {
+      console.warn('[LOAD ] No websites to check — exiting');
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'No websites configured', timestamp: new Date().toISOString() })
+      };
+    }
 
     // Create a client lookup map
     const clientMap = {};
@@ -305,7 +395,13 @@ const monitorHandler = async (event, context) => {
     });
 
     // Get active incidents to track recovery
-    const activeIncidents = await getActiveIncidents();
+    let activeIncidents = [];
+    try {
+      activeIncidents = await getActiveIncidents();
+    } catch (err) {
+      console.warn(`[WARN ] Failed to load active incidents: ${err.message} — continuing without incident tracking`);
+    }
+
     const activeIncidentsByWebsite = {};
     activeIncidents.forEach(inc => {
       if (!activeIncidentsByWebsite[inc.website_id]) {
@@ -314,11 +410,17 @@ const monitorHandler = async (event, context) => {
       activeIncidentsByWebsite[inc.website_id].push(inc);
     });
 
+    if (activeIncidents.length > 0) {
+      console.log(`[LOAD ] ${activeIncidents.length} active incident(s) being tracked`);
+    }
+
     // Check all websites with enhanced features
+    console.log(`[CHECK] Checking ${websites.length} websites...`);
+    console.log('-'.repeat(60));
+
     const results = await Promise.all(
       websites.map(async (site) => {
-        // Basic uptime check
-        const result = await checkWebsite(site.url);
+        const result = await checkWebsite(site);
 
         // Attach metadata
         result.name = site.name || site.url;
@@ -331,7 +433,7 @@ const monitorHandler = async (event, context) => {
           try {
             result.enhanced = await runEnhancedChecks(site);
           } catch (error) {
-            console.error(`Enhanced checks failed for ${site.name}:`, error);
+            console.error(`[ENH  ] Enhanced checks failed for ${site.name}: ${error.message}`);
             result.enhanced = { error: error.message };
           }
         }
@@ -340,65 +442,65 @@ const monitorHandler = async (event, context) => {
         const issues = collectIssues(result.enhanced);
 
         // Save check result to Supabase
-        await saveMonitorCheck({
-          websiteId: site.id,
-          timestamp: result.timestamp,
-          status: result.isUp ? 'up' : 'down',
-          responseTime: result.responseTime,
-          statusCode: result.status,
-          error: result.error || null,
-          issues,
-          metadata: result.enhanced ? {
-            visual: result.enhanced.visual ? {
-              hasChanged: result.enhanced.visual.hasChanged,
-              diffPercentage: result.enhanced.visual.diffPercentage
-            } : null,
-            customChecks: result.enhanced.custom ? {
-              total: result.enhanced.custom.results?.length || 0,
-              passed: result.enhanced.custom.results?.filter(c => c.passed).length || 0
-            } : null
-          } : {}
-        });
+        try {
+          await saveMonitorCheck({
+            websiteId: site.id,
+            timestamp: result.timestamp,
+            status: result.isUp ? 'up' : 'down',
+            responseTime: result.responseTime,
+            statusCode: result.status,
+            error: result.error || null,
+            issues,
+            metadata: result.enhanced ? {
+              visual: result.enhanced.visual ? {
+                hasChanged: result.enhanced.visual.hasChanged,
+                diffPercentage: result.enhanced.visual.diffPercentage
+              } : null,
+              customChecks: result.enhanced.custom ? {
+                total: result.enhanced.custom.results?.length || 0,
+                passed: result.enhanced.custom.results?.filter(c => c.passed).length || 0
+              } : null
+            } : {}
+          });
+        } catch (err) {
+          console.error(`[DB   ] Failed to save check for ${site.name}: ${err.message}`);
+        }
 
         // Handle incident tracking
         const siteActiveIncidents = activeIncidentsByWebsite[site.id] || [];
         const hasIssues = !result.isUp || issues.length > 0;
 
-        if (hasIssues && siteActiveIncidents.length === 0) {
-          // New incident
-          const incidentType = !result.isUp ? 'down' : 'issue';
-          const message = !result.isUp
-            ? `${site.name} is down: ${result.error || `HTTP ${result.status}`}`
-            : `${site.name} has issues: ${issues.map(i => i.message).join(', ')}`;
+        try {
+          if (hasIssues && siteActiveIncidents.length === 0) {
+            const incidentType = !result.isUp ? 'down' : 'issue';
+            const message = !result.isUp
+              ? `${site.name} is down: ${result.error || `HTTP ${result.status}`}`
+              : `${site.name} has issues: ${issues.map(i => i.message).join(', ')}`;
 
-          await createIncident({
-            websiteId: site.id,
-            startedAt: result.timestamp,
-            type: incidentType,
-            severity: !result.isUp ? 'critical' : 'warning',
-            message,
-            metadata: { issues }
-          });
-        } else if (!hasIssues && siteActiveIncidents.length > 0) {
-          // Recovered — resolve active incidents
-          await Promise.all(
-            siteActiveIncidents.map(inc =>
-              resolveIncident(inc.id, result.timestamp)
-            )
-          );
+            await createIncident({
+              websiteId: site.id,
+              startedAt: result.timestamp,
+              type: incidentType,
+              severity: !result.isUp ? 'critical' : 'warning',
+              message,
+              metadata: { issues }
+            });
+            console.log(`[INCID] Created ${incidentType} incident for ${site.name}`);
+          } else if (!hasIssues && siteActiveIncidents.length > 0) {
+            await Promise.all(
+              siteActiveIncidents.map(inc => resolveIncident(inc.id, result.timestamp))
+            );
+            console.log(`[RECOV] ${site.name} recovered — resolved ${siteActiveIncidents.length} incident(s)`);
+          }
+        } catch (err) {
+          console.error(`[INCID] Failed to update incidents for ${site.name}: ${err.message}`);
         }
 
         return result;
       })
     );
 
-    // Send alerts if issues detected
-    const alertResult = await sendAlert(results);
-
-    // Group results by client
-    const byClient = groupByClient(results);
-
-    // Calculate stats
+    // Summary stats
     const stats = {
       totalChecked: results.length,
       sitesUp: results.filter(r => r.isUp).length,
@@ -409,33 +511,51 @@ const monitorHandler = async (event, context) => {
       ).length
     };
 
-    // Prepare response
-    const response = {
-      version: '2.0-phase2',
-      timestamp: new Date().toISOString(),
-      stats,
-      results,
-      byClient,
-      alertSent: alertResult
-    };
+    console.log('-'.repeat(60));
+    console.log(`[DONE ] ${stats.totalChecked} checked — ${stats.sitesUp} up, ${stats.sitesDown} down`);
+    if (stats.visualChanges > 0) {
+      console.warn(`[DONE ] ${stats.visualChanges} visual change(s) detected`);
+    }
+    if (stats.customChecksFailed > 0) {
+      console.warn(`[DONE ] ${stats.customChecksFailed} site(s) with custom check failures`);
+    }
 
-    console.log('Enhanced monitoring check complete:', stats);
+    // Send alerts if issues detected
+    let alertResult = null;
+    const totalIssues = stats.sitesDown + stats.visualChanges + stats.customChecksFailed;
+    if (totalIssues > 0) {
+      console.log(`[ALERT] ${totalIssues} issue(s) found — sending alert...`);
+      alertResult = await sendAlert(results);
+    }
+
+    // Group results by client
+    const byClient = groupByClient(results);
+
+    const duration = Date.now() - runStart;
+    console.log(`[END  ] Enhanced monitor run complete in ${duration}ms`);
+    console.log('='.repeat(60));
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(response, null, 2)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        version: '2.0-phase2',
+        timestamp: new Date().toISOString(),
+        duration,
+        stats,
+        results,
+        byClient,
+        alertSent: alertResult
+      }, null, 2)
     };
   } catch (error) {
-    console.error('Monitoring error:', error);
+    const duration = Date.now() - runStart;
+    console.error(`[FATAL] Enhanced monitor run failed after ${duration}ms: ${error.message}`);
+    console.error(error.stack);
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: error.message })
     };
   }
 };
