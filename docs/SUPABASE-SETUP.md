@@ -69,8 +69,8 @@ Copy and paste this template with your actual values:
 
 ```
 SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4eHh4eHh4eHh4eHgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTYxODIyMTg2NSwiZXhwIjoxOTMzNzk3ODY1fQ.xxxxxxxxxxxxxxxxxx
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4eHh4eHh4eHh4eHgiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjE4MjIxODY1LCJleHAiOjE5MzM3OTc4NjV9.xxxxxxxxxxxxxxxxxx
+SUPABASE_ANON_KEY=xxxxxxxxxxxxxxxxxx
+SUPABASE_SERVICE_KEY=xxxxxxxxxxxxxxxxxx
 ```
 
 ---

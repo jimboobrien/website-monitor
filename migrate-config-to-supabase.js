@@ -8,6 +8,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const fs = require('fs').promises;
 const path = require('path');
+const process = require('process');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
