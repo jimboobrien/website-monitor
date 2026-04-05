@@ -146,7 +146,7 @@
           "id": "4.0.1",
           "title": "Supabase database schema",
           "description": "Design and create PostgreSQL schema for monitors, checks, incidents, and configuration",
-          "status": "pending",
+          "status": "completed",
           "priority": "critical",
           "blocksOtherTasks": true,
           "files": [
@@ -187,7 +187,7 @@
           "id": "4.0.2",
           "title": "Supabase Storage setup",
           "description": "Configure Storage buckets for screenshots and baselines",
-          "status": "pending",
+          "status": "completed",
           "priority": "critical",
           "blocksOtherTasks": true,
           "files": [
@@ -205,7 +205,7 @@
           "id": "4.0.3",
           "title": "Supabase client library",
           "description": "Create reusable Supabase client and helper functions",
-          "status": "pending",
+          "status": "completed",
           "priority": "high",
           "dependencies": ["4.0.1", "4.0.2"],
           "files": [
@@ -225,7 +225,7 @@
           "id": "4.0.4",
           "title": "Migrate storage.js to Supabase",
           "description": "Replace file-based storage with Supabase database and storage",
-          "status": "pending",
+          "status": "completed",
           "priority": "high",
           "dependencies": ["4.0.3"],
           "files": [
@@ -246,7 +246,7 @@
           "id": "4.0.5",
           "title": "Migrate config.json to database",
           "description": "Move website and client configuration from JSON file to Supabase",
-          "status": "pending",
+          "status": "completed",
           "priority": "medium",
           "dependencies": ["4.0.4"],
           "files": [
@@ -266,7 +266,7 @@
           "id": "4.0.6",
           "title": "Update monitor functions to use Supabase",
           "description": "Modify monitor.js and monitor-enhanced.js to write to Supabase",
-          "status": "pending",
+          "status": "completed",
           "priority": "high",
           "dependencies": ["4.0.4", "4.0.5"],
           "files": [
@@ -286,7 +286,7 @@
           "id": "4.0.7",
           "title": "Update dashboard API to use Supabase",
           "description": "Rewrite dashboard-data.js to query Supabase instead of file storage",
-          "status": "pending",
+          "status": "completed",
           "priority": "high",
           "dependencies": ["4.0.4"],
           "files": [

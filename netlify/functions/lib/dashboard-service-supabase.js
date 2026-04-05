@@ -15,7 +15,7 @@ const {
  * Calculate uptime percentage for a time period
  */
 function calculateUptime(checks) {
-  if (!checks || checks.length === 0) return 100;
+  if (!checks || checks.length === 0) return 0;
   
   const successfulChecks = checks.filter(c => c.status === 'up').length;
   return (successfulChecks / checks.length) * 100;
@@ -170,7 +170,7 @@ function getGlobalStats(monitorStats) {
   const uptimes24h = monitorStats.map(m => m.uptime['24h']);
   const overallUptime = uptimes24h.length > 0
     ? uptimes24h.reduce((a, b) => a + b, 0) / uptimes24h.length
-    : 100;
+    : 0;
   
   // Calculate average response time
   const responseTimes = monitorStats

@@ -389,38 +389,26 @@ function MonitorDetail({ monitor, onBack }) {
         </div>
       )}
       
-      {/* Actions */}
+      {/* Monitor Info */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => alert('Manual check coming in Phase 4!')}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-          >
-            🔄 Check Now
-          </button>
-          <button
-            onClick={() => alert('Edit monitor coming in Phase 4!')}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-          >
-            ✏️ Edit
-          </button>
-          <button
-            onClick={() => alert('Pause/Resume coming in Phase 4!')}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-          >
-            ⏸️ Pause
-          </button>
-          <button
-            onClick={() => {
-              if (confirm('Delete this monitor? This action cannot be undone.')) {
-                alert('Delete coming in Phase 4!');
-              }
-            }}
-            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-          >
-            🗑️ Delete
-          </button>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitor Info</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-gray-500">Client:</span>
+            <span className="ml-2 text-gray-900">{monitor.clientId || 'Uncategorized'}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Total Checks:</span>
+            <span className="ml-2 text-gray-900">{monitor.totalChecks}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">All-time Uptime:</span>
+            <span className="ml-2 text-gray-900">{monitor.uptime['all'].toFixed(2)}%</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Current Response:</span>
+            <span className="ml-2 text-gray-900">{monitor.responseTime.current}ms</span>
+          </div>
         </div>
       </div>
     </div>
@@ -598,7 +586,7 @@ function DashboardOverview({ globalStats, monitors }) {
         <StatCard
           title="Up"
           value={globalStats.monitorsUp}
-          subtitle={`${((globalStats.monitorsUp / globalStats.totalMonitors) * 100).toFixed(1)}%`}
+          subtitle={globalStats.totalMonitors > 0 ? `${((globalStats.monitorsUp / globalStats.totalMonitors) * 100).toFixed(1)}%` : 'No monitors'}
           color="green"
         />
         
