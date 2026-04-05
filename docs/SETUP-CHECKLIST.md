@@ -25,7 +25,7 @@ node setup-supabase.js
 
 ### 2. Create Storage Buckets
 
-Go to: https://fksomdzgdmgeksubvfxw.supabase.co/project/_/storage
+Go to: https://XXXXXXXXXXX.supabase.co/project/_/storage
 
 Create:
 - Bucket: `screenshots` (Public, 5MB limit)
@@ -51,9 +51,9 @@ Go to: https://app.netlify.com → Your site → Site settings → Environment v
 
 Add these 3 variables:
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://fksomdzgdmgeksubvfxw.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=sb_publishable_ZZphq5YtYbNRd-bpC-Hg4w_gg2P4itk
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrc29tZHpnZG1nZWtzdWJ2Znh3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTE3OTM3MiwiZXhwIjoyMDkwNzU1MzcyfQ.YHqFag6Q_52_VHBaMiI64hf1ACgsf_GH0qv6DOvd8xY
+NEXT_PUBLIC_SUPABASE_URL=https://XXXXXXXXXX.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=XXXXXXXXXXXXXX
+SUPABASE_SERVICE_KEY=XXXXXXXXXX
 ```
 
 **Verify:** Environment variables page shows all 3 Supabase vars

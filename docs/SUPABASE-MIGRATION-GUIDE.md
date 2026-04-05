@@ -12,7 +12,7 @@
 ## Step 1: Create Database Tables
 
 1. **Go to Supabase SQL Editor:**
-   - URL: https://fksomdzgdmgeksubvfxw.supabase.co/project/_/sql/new
+   - URL: https://XXXXXXXXXXXXXXXXX.supabase.co/project/_/sql/new
    - (Or: Supabase Dashboard → SQL Editor → New query)
 
 2. **Run the setup script to get the SQL:**
@@ -62,9 +62,9 @@ This will:
 
 2. **Add Supabase credentials:**
    ```
-   NEXT_PUBLIC_SUPABASE_URL=https://fksomdzgdmgeksubvfxw.supabase.co
-   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=sb_publishable_ZZphq5YtYbNRd-bpC-Hg4w_gg2P4itk
-   SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   NEXT_PUBLIC_SUPABASE_URL=https://XXXXXXXXXXXXXXXXX.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=XXXXXXXXXXXXXXXXX
+   SUPABASE_SERVICE_KEY=XXXXXXXXXXXXXXXXX
    ```
 
 3. **Redeploy your site** (Netlify will auto-deploy on push, or trigger manually)

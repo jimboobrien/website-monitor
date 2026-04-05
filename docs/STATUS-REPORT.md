@@ -79,7 +79,7 @@ node setup-supabase.js
 ```
 
 Copy the SQL output and run it here:
-https://fksomdzgdmgeksubvfxw.supabase.co/project/_/sql/new
+https://XXXXXXXXXXXXXXXXX.supabase.co/project/_/sql/new
 
 This creates 6 tables:
 - `clients` - Customer information
@@ -91,7 +91,7 @@ This creates 6 tables:
 
 ### Step 2: Create Storage Buckets (2 minutes)
 
-Go to: https://fksomdzgdmgeksubvfxw.supabase.co/project/_/storage
+Go to: https://XXXXXXXXXXXXXXXXX.supabase.co/project/_/storage
 
 Create two public buckets:
 1. `screenshots` (5MB limit)
@@ -113,9 +113,9 @@ Go to: Netlify Dashboard → Site settings → Environment variables
 
 Add:
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://fksomdzgdmgeksubvfxw.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=sb_publishable_ZZphq5YtYbNRd-bpC-Hg4w_gg2P4itk
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrc29tZHpnZG1nZWtzdWJ2Znh3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTE3OTM3MiwiZXhwIjoyMDkwNzU1MzcyfQ.YHqFag6Q_52_VHBaMiI64hf1ACgsf_GH0qv6DOvd8xY
+NEXT_PUBLIC_SUPABASE_URL=https://XXXXXXXXXXXXXXXXX.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=XXXXXXXXXXXXXXXXX
+SUPABASE_SERVICE_KEY=XXXXXXXXXXXXXXXXX
 ```
 
 ### Step 5: Test Locally (5 minutes)
