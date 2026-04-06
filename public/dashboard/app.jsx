@@ -10,6 +10,7 @@ const MONITOR_ENHANCED_URL = '/.netlify/functions/monitor-enhanced';
 const SNAPSHOT_URL = '/.netlify/functions/snapshot';
 const CLIENTS_URL = '/.netlify/functions/clients';
 const MONITORS_URL = '/.netlify/functions/monitors';
+const WEBSITES_URL = '/.netlify/functions/websites';
 
 // Utility: Fetch dashboard data
 async function fetchDashboardData(action, params = {}) {
@@ -55,6 +56,27 @@ async function deleteCheckApi(checkId) {
   const response = await fetch(`${MONITORS_URL}?action=delete-check&checkId=${checkId}`, { method: 'DELETE' });
   if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
   return await response.json();
+}
+
+// Create helpers
+async function createClientApi(client) {
+  const response = await fetch(CLIENTS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(client)
+  });
+  if (!response.ok) { const e = await response.json(); throw new Error(e.error || response.status); }
+  return (await response.json()).data;
+}
+
+async function createWebsiteApi(website) {
+  const response = await fetch(WEBSITES_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(website)
+  });
+  if (!response.ok) { const e = await response.json(); throw new Error(e.error || response.status); }
+  return (await response.json()).data;
 }
 
 // Client API helpers
@@ -127,14 +149,16 @@ function ClientBadge({ client }) {
 }
 
 // Clients Management View
-function ClientsView() {
+function ClientsView({ showToast }) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [newClient, setNewClient] = useState({ name: '', email: '', color: '#3B82F6' });
 
-  useEffect(() => {
-    fetchClients().then(setClients).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  const loadClients = () => fetchClients().then(setClients).catch(console.error).finally(() => setLoading(false));
+
+  useEffect(() => { loadClients(); }, []);
 
   const handleColorChange = async (clientId, color) => {
     setSaving(clientId);
@@ -142,10 +166,24 @@ function ClientsView() {
       const updated = await updateClientApi(clientId, { color });
       setClients(prev => prev.map(c => c.id === clientId ? { ...c, color: updated.color } : c));
     } catch (err) {
-      console.error('Failed to update client color:', err);
-      alert('Failed to save color: ' + err.message);
+      if (showToast) showToast('Failed to save color: ' + err.message, 'error');
     } finally {
       setSaving(null);
+    }
+  };
+
+  const handleAddClient = async (e) => {
+    e.preventDefault();
+    if (!newClient.name.trim()) return;
+    try {
+      const id = newClient.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      await createClientApi({ id, name: newClient.name, email: newClient.email || null, color: newClient.color });
+      setNewClient({ name: '', email: '', color: '#3B82F6' });
+      setShowForm(false);
+      await loadClients();
+      if (showToast) showToast(`Client "${newClient.name}" created`, 'success');
+    } catch (err) {
+      if (showToast) showToast('Failed to create client: ' + err.message, 'error');
     }
   };
 
@@ -159,34 +197,243 @@ function ClientsView() {
 
   return (
     <div>
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Client Colors</h2>
+      {/* Add Client Form */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Clients ({clients.length})</h2>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+          >
+            {showForm ? 'Cancel' : 'Add Client'}
+          </button>
+        </div>
+
+        {showForm && (
+          <form onSubmit={handleAddClient} className="border border-gray-200 rounded-lg p-4 mb-6 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
+              <input
+                type="text"
+                value={newClient.name}
+                onChange={(e) => setNewClient(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Client name"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input
+                type="email"
+                value={newClient.email}
+                onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="client@example.com"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Color</label>
+              <ColorPicker value={newClient.color} onChange={(color) => setNewClient(prev => ({ ...prev, color }))} />
+            </div>
+            <button type="submit" className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+              Create Client
+            </button>
+          </form>
+        )}
+
+        {/* Client List */}
         <div className="space-y-6">
           {clients.map(client => (
             <div key={client.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
               <div className="flex items-center gap-3 mb-3">
-                <span
-                  className="w-4 h-4 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: client.color || '#6B7280' }}
-                ></span>
+                <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: client.color || '#6B7280' }}></span>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-gray-900">{client.name}</h3>
                   <p className="text-xs text-gray-500">{client.id}{client.email ? ` \u2022 ${client.email}` : ''}</p>
                 </div>
-                {saving === client.id && (
-                  <span className="text-xs text-blue-600">Saving...</span>
-                )}
+                {saving === client.id && <span className="text-xs text-blue-600">Saving...</span>}
               </div>
-              <ColorPicker
-                value={client.color || '#6B7280'}
-                onChange={(color) => handleColorChange(client.id, color)}
-              />
+              <ColorPicker value={client.color || '#6B7280'} onChange={(color) => handleColorChange(client.id, color)} />
             </div>
           ))}
-          {clients.length === 0 && (
-            <p className="text-sm text-gray-500">No clients found.</p>
-          )}
+          {clients.length === 0 && <p className="text-sm text-gray-500">No clients yet. Add one above.</p>}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Add Website Form Component
+function AddWebsiteView({ showToast, onCreated }) {
+  const [clients, setClients] = useState([]);
+  const [form, setForm] = useState({ name: '', url: '', clientId: '', visualCheck: false });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => { fetchClients().then(setClients).catch(console.error); }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.url.trim()) return;
+
+    // Ensure URL has protocol
+    let url = form.url.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+
+    try {
+      setSubmitting(true);
+      await createWebsiteApi({
+        name: form.name,
+        url,
+        clientId: form.clientId || null,
+        visualCheck: form.visualCheck
+      });
+      if (showToast) showToast(`"${form.name}" added to monitoring`, 'success');
+      setForm({ name: '', url: '', clientId: '', visualCheck: false });
+      if (onCreated) onCreated();
+    } catch (err) {
+      if (showToast) showToast('Failed to create website: ' + err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Website</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="My Website"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">URL *</label>
+            <input
+              type="text"
+              value={form.url}
+              onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="https://example.com"
+              required
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Client</label>
+            <select
+              value={form.clientId}
+              onChange={(e) => setForm(prev => ({ ...prev, clientId: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No client</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.visualCheck}
+                onChange={(e) => setForm(prev => ({ ...prev, visualCheck: e.target.checked }))}
+                className="rounded border-gray-300"
+              />
+              Enable visual monitoring
+            </label>
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+        >
+          {submitting ? 'Adding...' : 'Add Website'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// Alert History View
+function AlertHistoryView() {
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData('alert-history', { limit: 100 })
+      .then(setAlerts)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Alert Log ({alerts.length})</h2>
+        {alerts.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-8">No alerts sent yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
+                  <th className="pb-2 pr-4">Time</th>
+                  <th className="pb-2 pr-4">Website</th>
+                  <th className="pb-2 pr-4">Type</th>
+                  <th className="pb-2 pr-4">Recipient</th>
+                  <th className="pb-2 pr-4">Subject</th>
+                  <th className="pb-2 pr-4">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alerts.map((alert) => (
+                  <tr key={alert.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">
+                      {alert.sent_at ? format(new Date(alert.sent_at), 'MMM dd HH:mm') : '—'}
+                    </td>
+                    <td className="py-2 pr-4 text-gray-900">
+                      {alert.websites?.name || alert.website_id || '—'}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        alert.alert_type === 'down' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {alert.alert_type || 'alert'}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 text-gray-500 text-xs">{alert.recipient}</td>
+                    <td className="py-2 pr-4 text-gray-700 text-xs max-w-xs truncate">{alert.subject}</td>
+                    <td className="py-2 pr-4">
+                      {alert.success ? (
+                        <span className="text-green-600 text-xs font-medium">Sent</span>
+                      ) : (
+                        <span className="text-red-600 text-xs font-medium" title={alert.error_message}>Failed</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1296,7 +1543,7 @@ function App() {
     if (hash.startsWith('#/monitor/')) {
       return { view: 'detail', monitorId: hash.replace('#/monitor/', '') };
     }
-    const routes = { '#/': 'overview', '#/monitors': 'monitors', '#/clients': 'clients', '#/endpoints': 'endpoints' };
+    const routes = { '#/': 'overview', '#/monitors': 'monitors', '#/clients': 'clients', '#/add-website': 'add-website', '#/alerts': 'alerts', '#/endpoints': 'endpoints' };
     return { view: routes[hash] || 'overview', monitorId: null };
   };
 
@@ -1625,6 +1872,26 @@ function App() {
                 Clients
               </button>
               <button
+                onClick={() => navigate('#/add-website')}
+                className={`pb-2 px-1 font-medium text-sm ${
+                  view === 'add-website'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Add Website
+              </button>
+              <button
+                onClick={() => navigate('#/alerts')}
+                className={`pb-2 px-1 font-medium text-sm ${
+                  view === 'alerts'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Email Logs
+              </button>
+              <button
                 onClick={() => navigate('#/endpoints')}
                 className={`pb-2 px-1 font-medium text-sm ${
                   view === 'endpoints'
@@ -1670,7 +1937,15 @@ function App() {
         )}
 
         {view === 'clients' && (
-          <ClientsView />
+          <ClientsView showToast={showToast} />
+        )}
+
+        {view === 'add-website' && (
+          <AddWebsiteView showToast={showToast} onCreated={loadData} />
+        )}
+
+        {view === 'alerts' && (
+          <AlertHistoryView />
         )}
 
         {view === 'endpoints' && (

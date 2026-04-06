@@ -20,7 +20,7 @@ const {
   getUptimeHistory
 } = require('./lib/dashboard-service-supabase');
 
-const { getMonitorChecks, listScreenshots, getBaselineUrl } = require('./lib/supabase');
+const { getMonitorChecks, listScreenshots, getBaselineUrl, getAlertHistory } = require('./lib/supabase');
 
 // No longer need config.json - all config comes from Supabase
 
@@ -214,6 +214,46 @@ exports.handler = async (event, context) => {
         };
       }
 
+      case 'alert-history': {
+        const monitorId = params.id;
+        const limit = parseInt(params.limit || '50', 10);
+
+        if (!monitorId) {
+          // Get all alert history across all websites
+          const { getSupabaseClient } = require('./lib/supabase');
+          const supabase = getSupabaseClient();
+          const { data, error } = await supabase
+            .from('alert_history')
+            .select('*, websites(name)')
+            .order('sent_at', { ascending: false })
+            .limit(limit);
+
+          if (error) throw error;
+
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              success: true,
+              data: data || [],
+              timestamp: Date.now()
+            })
+          };
+        }
+
+        const history = await getAlertHistory(monitorId, limit);
+
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            data: history,
+            timestamp: Date.now()
+          })
+        };
+      }
+
       case 'checks': {
         const monitorId = params.id;
         const hours = parseInt(params.hours || '24', 10);
@@ -253,7 +293,8 @@ exports.handler = async (event, context) => {
               'response-time',
               'uptime-history',
               'checks',
-              'screenshots'
+              'screenshots',
+              'alert-history'
             ]
           })
         };
