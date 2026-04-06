@@ -1,5 +1,5 @@
-const chromium = require('@sparticuz/chromium');
-const puppeteer = require('puppeteer-core');
+const chromium = require('chrome-aws-lambda');
+const puppeteer = chromium.puppeteer;
 const { PNG } = require('pngjs');
 
 let _pixelmatch;
@@ -26,9 +26,9 @@ async function takeScreenshot(url, options = {}) {
   
   try {
     browser = await puppeteer.launch({
-      args: [...chromium.args, '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+      args: chromium.args,
       defaultViewport: { width, height },
-      executablePath: await chromium.executablePath(),
+      executablePath: await chromium.executablePath,
       headless: chromium.headless,
     });
 

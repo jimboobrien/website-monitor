@@ -1,5 +1,5 @@
-const chromium = require('@sparticuz/chromium');
-const puppeteer = require('puppeteer-core');
+const chromium = require('chrome-aws-lambda');
+const puppeteer = chromium.puppeteer;
 
 /**
  * Run custom checks on a website using Puppeteer
@@ -15,7 +15,7 @@ async function runCustomChecks(url, checks = []) {
     browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
+      executablePath: await chromium.executablePath,
       headless: chromium.headless,
     });
 
